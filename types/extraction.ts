@@ -10,6 +10,8 @@ export interface ExtractedTask {
   tags: string[];
   notes?: string;
   timeConfidence: TimeConfidence;
+  /** 0 (least confident) to 1 (most confident) */
+  confidence?: number;
 }
 
 export interface ExtractionResult {

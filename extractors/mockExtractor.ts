@@ -4,6 +4,8 @@ import { TimeConfidence, TaskPriority } from "@/types/task";
 
 const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
 
+// -- Date parsing -----------------------------------------------------------
+
 function parseDateInfo(
   text: string
 ): { dueText: string; dueAt?: string } | null {
@@ -12,6 +14,7 @@ function parseDateInfo(
 
   let daysFromNow: number | null = null;
   let label = "";
+  const wd = WEEKDAY_NAMES.join("");
 
   // 今天 / 今晚
   if (/^今[天日晚]/.test(text)) {
@@ -28,9 +31,10 @@ function parseDateInfo(
     label = "大后天";
   } else {
     // 下周一 ~ 下周日
-    const nw = text.match(/^下周([" + WEEKDAY_NAMES.join("") + "])/);
+    const nw = text.match(new RegExp(`^下周[${wd}]`));
     if (nw) {
-      const dayIdx = WEEKDAY_NAMES.indexOf(nw[1]);
+      const dayChar = nw[0].slice(2);
+      const dayIdx = WEEKDAY_NAMES.indexOf(dayChar);
       if (dayIdx !== -1) {
         const cur = today.getDay();
         daysFromNow = dayIdx - cur + (dayIdx <= cur ? 14 : 7);
@@ -38,9 +42,10 @@ function parseDateInfo(
       }
     } else {
       // 周一 ~ 周日 (本周)
-      const wd = text.match(/^[周星期]([" + WEEKDAY_NAMES.join("") + "])/);
-      if (wd) {
-        const dayIdx = WEEKDAY_NAMES.indexOf(wd[1]);
+      const wdm = text.match(new RegExp(`^[周星期][${wd}]`));
+      if (wdm) {
+        const dayChar = wdm[0].slice(1);
+        const dayIdx = WEEKDAY_NAMES.indexOf(dayChar);
         if (dayIdx !== -1) {
           const cur = today.getDay();
           daysFromNow = dayIdx - cur + (dayIdx <= cur ? 7 : 0);
@@ -94,16 +99,16 @@ function detectPriority(text: string): TaskPriority {
   return "none";
 }
 
+// -- Title cleaning ---------------------------------------------------------
+
 function cleanTitle(segment: string): string {
   let title = segment;
-  // 去掉句首日期短语
   title = title
     .replace(
       /^(?:明天|今天|今晚|明早|明晚|后天|大后天|下周[一二三四五六日]|周[一二三四五六日]|星期[一二三四五六日])\s*/,
       ""
     )
     .trim();
-  // 去掉时间短语
   title = title
     .replace(
       /(?:下午|晚上|傍晚|上午|早上)?\s*\d{1,2}\s*[：:]\s*\d{2}\s*/,
@@ -113,25 +118,88 @@ function cleanTitle(segment: string): string {
   title = title
     .replace(/(?:下午|晚上|傍晚|上午|早上)?\s*\d{1,2}\s*点(?:半|钟)?\s*/, "")
     .trim();
-  // 去掉日期数字
   title = title
     .replace(/\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*日?\s*/, "")
     .trim();
+  title = title.replace(/\d{1,2}\s*月\s*\d{1,2}\s*日\s*/, "").trim();
   title = title
-    .replace(/\d{1,2}\s*月\s*\d{1,2}\s*日\s*/, "")
+    .replace(/[（(]\s*(?:紧急|重要|urgent|high)\s*[）)]/g, "")
     .trim();
-  // 去掉优先级标记 (紧急) (重要)
-  title = title.replace(/[（(]\s*(?:紧急|重要|urgent|high)\s*[）)]/g, "").trim();
 
   return title || segment;
 }
 
-function splitText(text: string): string[] {
-  return text
-    .split(/[\n;；。！？]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 2);
+// -- Segmentation -----------------------------------------------------------
+
+/**
+ * Split raw input text into candidate task segments, supporting:
+ * - single sentences
+ * - multi-line (one task per line)
+ * - numbered lists (1. / 1、 / 1） inline or multi-line)
+ * - bullet lists (- / *)
+ */
+function splitIntoSegments(text: string): string[] {
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const segments: string[] = [];
+
+  for (const line of lines) {
+    // Inline numbered list: e.g. "1. 交报告 2. 联系老师 3. 买牛奶"
+    if (/^\d+[.、）)].*\d+[.、）)]/.test(line)) {
+      const parts = line.split(/(?=\d+[.、）)])/).filter((p) => /\S/.test(p));
+      for (const part of parts) {
+        const cleaned = part.replace(/^\d+[.、）)]\s*/, "").trim();
+        if (cleaned.length >= 2) segments.push(cleaned);
+      }
+      continue;
+    }
+
+    // Single numbered item: "1. 交报告"
+    const numbered = line.match(/^\d+[.、）)]\s*(.+)/);
+    if (numbered) {
+      const content = numbered[1].trim();
+      if (content.length >= 2) segments.push(content);
+      continue;
+    }
+
+    // Bullet item: "- 交报告" or "* 交报告"
+    const bullet = line.match(/^[-*]\s*(.+)/);
+    if (bullet) {
+      const content = bullet[1].trim();
+      if (content.length >= 2) segments.push(content);
+      continue;
+    }
+
+    // Plain line
+    if (line.length >= 2) segments.push(line);
+  }
+
+  return segments;
 }
+
+// -- Confidence -------------------------------------------------------------
+
+function computeConfidence(text: string, hasDate: boolean): number {
+  if (hasDate) return 0.85;
+  if (/[会要去到做买看找取送交联系]/.test(text)) return 0.75;
+  if (text.length > 8) return 0.65;
+  if (text.length <= 5) return 0.5;
+  return 0.6;
+}
+
+// -- Task ID ----------------------------------------------------------------
+
+let idCounter = 0;
+
+function nextId(): string {
+  idCounter += 1;
+  return `ext-${Date.now()}-${idCounter}`;
+}
+
+// -- Extractor --------------------------------------------------------------
 
 export class MockExtractor implements Extractor {
   readonly name = "mock";
@@ -139,13 +207,23 @@ export class MockExtractor implements Extractor {
   async extract(text: string): Promise<ExtractionResult> {
     await new Promise((r) => setTimeout(r, 400 + Math.random() * 300));
 
-    const segments = splitText(text);
-    const tasks: ExtractedTask[] = segments.map((segment, index) => {
+    const trimmed = text.trim();
+    if (!trimmed || trimmed.length < 3) {
+      return { tasks: [], rawText: text };
+    }
+
+    const segments = splitIntoSegments(trimmed);
+    if (segments.length === 0) {
+      return { tasks: [], rawText: text };
+    }
+
+    const tasks: ExtractedTask[] = segments.map((segment) => {
       const dateInfo = parseDateInfo(segment);
       const title = cleanTitle(segment);
+      const confidence = computeConfidence(segment, !!dateInfo);
 
       return {
-        id: `ext-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+        id: nextId(),
         title,
         sourceText: segment,
         dueText: dateInfo?.dueText,
@@ -154,6 +232,7 @@ export class MockExtractor implements Extractor {
         tags: [],
         timeConfidence: dateInfo?.dueAt ? "medium" : "none",
         needsConfirmation: true,
+        confidence,
       };
     });
 

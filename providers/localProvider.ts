@@ -7,7 +7,7 @@ export async function getLocalTasks(): Promise<NormalizedTask[]> {
 
 export async function createLocalTask(
   title: string,
-  extra?: { dueAt?: string; notes?: string }
+  extra?: { dueAt?: string; notes?: string; sourceText?: string }
 ): Promise<NormalizedTask> {
   const tasks = await loadTasks();
   const now = new Date().toISOString();
@@ -24,6 +24,7 @@ export async function createLocalTask(
     updatedAt: now,
     ...(extra?.dueAt && { dueAt: extra.dueAt }),
     ...(extra?.notes && { notes: extra.notes }),
+    ...(extra?.sourceText && { sourceText: extra.sourceText }),
   };
   tasks.push(task);
   await saveTasks(tasks);

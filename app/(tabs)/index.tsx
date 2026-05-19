@@ -22,7 +22,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 export default function InboxScreen() {
   const { tasks, loading, error, addTask, toggleDone, removeTask, refresh } =
     useTasks();
-  const { candidates, extracting, extract, confirmTask, dismissTask, confirmAll, closePanel } =
+  const { candidates, extracting, extract, confirmTask, dismissTask, confirmAll, closePanel, updateCandidate } =
     useTaskExtraction();
   const [pendingSave, setPendingSave] = useState(false);
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
@@ -31,7 +31,8 @@ export default function InboxScreen() {
   const handleConfirm = async (task: ExtractedTask) => {
     await addTask(task.title, {
       dueAt: task.dueAt,
-      notes: task.notes,
+      notes: task.dueText ? `截止: ${task.dueText}` : undefined,
+      sourceText: task.sourceText,
     });
     confirmTask(task.id);
   };
@@ -41,7 +42,8 @@ export default function InboxScreen() {
     for (const t of candidates) {
       await addTask(t.title, {
         dueAt: t.dueAt,
-        notes: t.notes,
+        notes: t.dueText ? `截止: ${t.dueText}` : undefined,
+        sourceText: t.sourceText,
       });
     }
     setPendingSave(false);
@@ -117,6 +119,7 @@ export default function InboxScreen() {
                   task={item}
                   onConfirm={handleConfirm}
                   onDismiss={dismissTask}
+                  onFieldChange={updateCandidate}
                 />
               )}
               style={styles.cardList}

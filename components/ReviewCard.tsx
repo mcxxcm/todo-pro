@@ -1,4 +1,11 @@
-import { StyleSheet, TouchableOpacity, Text, View } from "react-native";
+import { useState, useEffect } from "react";
+import {
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  View,
+  TextInput,
+} from "react-native";
 import { ExtractedTask } from "@/types/extraction";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -9,11 +16,46 @@ interface ReviewCardProps {
   task: ExtractedTask;
   onConfirm: (task: ExtractedTask) => void;
   onDismiss: (taskId: string) => void;
+  onFieldChange?: (id: string, field: "title" | "dueText", value: string) => void;
 }
 
-export function ReviewCard({ task, onConfirm, onDismiss }: ReviewCardProps) {
+export function ReviewCard({
+  task,
+  onConfirm,
+  onDismiss,
+  onFieldChange,
+}: ReviewCardProps) {
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = Colors[colorScheme];
+
+  const [editTitle, setEditTitle] = useState(task.title);
+  const [editDueText, setEditDueText] = useState(task.dueText ?? "");
+
+  // Reset local state when a new extraction comes in
+  useEffect(() => {
+    setEditTitle(task.title);
+    setEditDueText(task.dueText ?? "");
+  }, [task.id, task.title, task.dueText]);
+
+  const titleEmpty = !editTitle.trim();
+
+  const handleChangeTitle = (text: string) => {
+    setEditTitle(text);
+    onFieldChange?.(task.id, "title", text);
+  };
+
+  const handleChangeDueText = (text: string) => {
+    setEditDueText(text);
+    onFieldChange?.(task.id, "dueText", text);
+  };
+
+  const handleConfirm = () => {
+    onConfirm({
+      ...task,
+      title: editTitle,
+      dueText: editDueText || undefined,
+    });
+  };
 
   return (
     <ThemedView
@@ -25,21 +67,41 @@ export function ReviewCard({ task, onConfirm, onDismiss }: ReviewCardProps) {
         },
       ]}
     >
-      <ThemedText style={styles.title} numberOfLines={2}>
-        {task.title}
-      </ThemedText>
+      <TextInput
+        style={[
+          styles.titleInput,
+          {
+            color: colors.text,
+            borderBottomColor: colors.icon,
+          },
+        ]}
+        value={editTitle}
+        onChangeText={handleChangeTitle}
+        placeholder="任务标题"
+        placeholderTextColor={colors.icon}
+        returnKeyType="next"
+      />
 
       <ThemedText style={styles.sourceText} numberOfLines={2}>
         {task.sourceText}
       </ThemedText>
 
-      {task.dueText && (
-        <View style={styles.dueRow}>
-          <Text style={[styles.dueBadge, { color: colors.tint }]}>
-            {task.dueText}
-          </Text>
-        </View>
-      )}
+      <View style={styles.dueRow}>
+        <TextInput
+          style={[
+            styles.dueInput,
+            {
+              color: colors.text,
+              borderBottomColor: colors.icon,
+            },
+          ]}
+          value={editDueText}
+          onChangeText={handleChangeDueText}
+          placeholder="添加截止日期..."
+          placeholderTextColor={colors.icon}
+          returnKeyType="done"
+        />
+      </View>
 
       <View style={styles.actions}>
         <TouchableOpacity
@@ -53,8 +115,13 @@ export function ReviewCard({ task, onConfirm, onDismiss }: ReviewCardProps) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => onConfirm(task)}
-          style={[styles.actionBtn, styles.confirmBtn]}
+          onPress={handleConfirm}
+          disabled={titleEmpty}
+          style={[
+            styles.actionBtn,
+            styles.confirmBtn,
+            titleEmpty && styles.confirmDisabled,
+          ]}
           activeOpacity={0.7}
         >
           <Text style={styles.confirmText}>确认保存</Text>
@@ -76,10 +143,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  title: {
+  titleInput: {
     fontSize: 16,
     fontWeight: "600",
-    marginBottom: 4,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    marginBottom: 6,
   },
   sourceText: {
     fontSize: 13,
@@ -90,9 +159,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginBottom: 12,
   },
-  dueBadge: {
-    fontSize: 13,
-    fontWeight: "500",
+  dueInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
   },
   actions: {
     flexDirection: "row",
@@ -112,6 +183,9 @@ const styles = StyleSheet.create({
   },
   confirmBtn: {
     backgroundColor: "#007aff",
+  },
+  confirmDisabled: {
+    opacity: 0.4,
   },
   confirmText: {
     color: "#fff",

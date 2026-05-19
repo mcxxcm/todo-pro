@@ -37,6 +37,15 @@ export function useTaskExtraction() {
     setCandidates([]);
   }, []);
 
+  const updateCandidate = useCallback(
+    (id: string, field: "title" | "dueText", value: string) => {
+      setCandidates((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, [field]: value } : t))
+      );
+    },
+    []
+  );
+
   return {
     candidates,
     extracting,
@@ -45,5 +54,6 @@ export function useTaskExtraction() {
     dismissTask,
     confirmAll,
     closePanel,
+    updateCandidate,
   };
 }

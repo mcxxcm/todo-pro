@@ -30,7 +30,7 @@ export function useTasks() {
   }, [refresh]);
 
   const addTask = useCallback(
-    async (title: string, extra?: { dueAt?: string; notes?: string }) => {
+    async (title: string, extra?: { dueAt?: string; notes?: string; sourceText?: string }) => {
       if (!title.trim()) return;
       try {
         await createLocalTask(title, extra);

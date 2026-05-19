@@ -30,10 +30,10 @@ export function useTasks() {
   }, [refresh]);
 
   const addTask = useCallback(
-    async (title: string) => {
+    async (title: string, extra?: { dueAt?: string; notes?: string }) => {
       if (!title.trim()) return;
       try {
-        await createLocalTask(title);
+        await createLocalTask(title, extra);
         await refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to add task");

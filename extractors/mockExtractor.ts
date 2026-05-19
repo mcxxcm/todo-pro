@@ -3,6 +3,47 @@ import { ExtractedTask, ExtractionResult } from "@/types/extraction";
 import { TimeConfidence, TaskPriority } from "@/types/task";
 
 const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
+const CN_DIGITS: Record<string, number> = {
+  一: 1, 二: 2, 三: 3, 四: 4, 五: 5,
+  六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
+  廿: 20,
+};
+
+// -- Helpers -----------------------------------------------------------------
+
+function parseChineseNumber(s: string): number | null {
+  if (s in CN_DIGITS) return CN_DIGITS[s];
+  const tens = s.match(/^十([一二三四五六七八九])?$/);
+  if (tens) return 10 + (tens[1] ? CN_DIGITS[tens[1]] : 0);
+  const twenties = s.match(/^二十([一二三四五六七八九])?$/);
+  if (twenties) return 20 + (twenties[1] ? CN_DIGITS[twenties[1]] : 0);
+  const thirties = s.match(/^三十([一二三四五六七八九])?$/);
+  if (thirties) return 30 + (thirties[1] ? CN_DIGITS[thirties[1]] : 0);
+  return null;
+}
+
+function extractTimeFromText(
+  text: string
+): { hour: number; minute: number } | null {
+  const timeMatch = text.match(
+    /(?:下午|晚上|傍晚|上午|早上)?\s*(\d{1,2})\s*[：:](\d{2})/
+  );
+  if (timeMatch) {
+    let h = parseInt(timeMatch[1]);
+    const m = parseInt(timeMatch[2]);
+    if (/下午|晚上|傍晚/.test(text) && h < 12) h += 12;
+    return { hour: h, minute: m };
+  }
+  const hourMatch = text.match(
+    /(?:下午|晚上|傍晚|上午|早上)?\s*(\d{1,2})\s*点/
+  );
+  if (hourMatch) {
+    let h = parseInt(hourMatch[1]);
+    if (/下午|晚上|傍晚/.test(text) && h < 12) h += 12;
+    return { hour: h, minute: 0 };
+  }
+  return null;
+}
 
 // -- Date parsing -----------------------------------------------------------
 
@@ -11,6 +52,71 @@ function parseDateInfo(
 ): { dueText: string; dueAt?: string } | null {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // -- Phase 1: Full date (5.15, 5/15, 5月15日, 五月十五日) ----------------
+
+  let month: number | null = null;
+  let day: number | null = null;
+  let fullDateStr = "";
+
+  // 5.15 / 5/15  (先验证，避免把 15 当成时间)
+  const dotSlash = text.match(/^(\d{1,2})\s*[./]\s*(\d{1,2})/);
+  if (dotSlash) {
+    const m = parseInt(dotSlash[1]);
+    const d = parseInt(dotSlash[2]);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      month = m;
+      day = d;
+      fullDateStr = `${m}月${d}日`;
+    }
+  }
+
+  // 5月15日 / 5月15
+  if (month === null) {
+    const numMD = text.match(/^(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
+    if (numMD) {
+      const m = parseInt(numMD[1]);
+      const d = parseInt(numMD[2]);
+      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        month = m;
+        day = d;
+        fullDateStr = `${m}月${d}日`;
+      }
+    }
+  }
+
+  // 五月十五日 / 五月十五
+  if (month === null) {
+    const cnMD = text.match(
+      /^([一二三四五六七八九十廿]+)\s*月\s*([一二三四五六七八九十廿]+)\s*日?/
+    );
+    if (cnMD) {
+      const m = parseChineseNumber(cnMD[1]);
+      const d = parseChineseNumber(cnMD[2]);
+      if (m !== null && d !== null && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        month = m;
+        day = d;
+        fullDateStr = `${m}月${d}日`;
+      }
+    }
+  }
+
+  if (month !== null && day !== null) {
+    const time = extractTimeFromText(text);
+    const dueDate = new Date(today.getFullYear(), month - 1, day);
+    let label = fullDateStr;
+    if (time) {
+      dueDate.setHours(time.hour, time.minute, 0, 0);
+      label += ` ${String(time.hour).padStart(2, "0")}:${String(
+        time.minute
+      ).padStart(2, "0")}`;
+    } else {
+      dueDate.setHours(23, 59, 0, 0);
+    }
+    return { dueText: label, dueAt: dueDate.toISOString() };
+  }
+
+  // -- Phase 2: Relative date ----------------------------------------------
 
   let daysFromNow: number | null = null;
   let label = "";
@@ -55,42 +161,34 @@ function parseDateInfo(
     }
   }
 
-  if (daysFromNow === null) return null;
-
-  // 提取时间
-  let hour: number | null = null;
-  let minute = 0;
-
-  const timeMatch = text.match(
-    /(?:下午|晚上|傍晚|上午|早上)?\s*(\d{1,2})\s*[：:](\d{2})/
-  );
-  if (timeMatch) {
-    hour = parseInt(timeMatch[1]);
-    minute = parseInt(timeMatch[2]);
-    if (/下午|晚上|傍晚/.test(text) && hour < 12) hour += 12;
-  } else {
-    const hourMatch = text.match(
-      /(?:下午|晚上|傍晚|上午|早上)?\s*(\d{1,2})\s*点/
-    );
-    if (hourMatch) {
-      hour = parseInt(hourMatch[1]);
-      if (/下午|晚上|傍晚/.test(text) && hour < 12) hour += 12;
+  if (daysFromNow !== null) {
+    const time = extractTimeFromText(text);
+    const dueDate = new Date(today);
+    dueDate.setDate(dueDate.getDate() + daysFromNow);
+    if (time) {
+      dueDate.setHours(time.hour, time.minute, 0, 0);
+      label += ` ${String(time.hour).padStart(2, "0")}:${String(
+        time.minute
+      ).padStart(2, "0")}`;
+    } else {
+      dueDate.setHours(23, 59, 0, 0);
     }
+    return { dueText: label, dueAt: dueDate.toISOString() };
   }
 
-  const dueDate = new Date(today);
-  dueDate.setDate(dueDate.getDate() + daysFromNow);
+  // -- Phase 3: Time-only (默认今天) ---------------------------------------
 
-  if (hour !== null) {
-    dueDate.setHours(hour, minute, 0, 0);
-    label += ` ${hour.toString().padStart(2, "0")}:${minute
-      .toString()
-      .padStart(2, "0")}`;
-  } else {
-    dueDate.setHours(23, 59, 0, 0);
+  const time = extractTimeFromText(text);
+  if (time) {
+    const dueDate = new Date(today);
+    dueDate.setHours(time.hour, time.minute, 0, 0);
+    const label = `今天 ${String(time.hour).padStart(2, "0")}:${String(
+      time.minute
+    ).padStart(2, "0")}`;
+    return { dueText: label, dueAt: dueDate.toISOString() };
   }
 
-  return { dueText: label, dueAt: dueDate.toISOString() };
+  return null;
 }
 
 function detectPriority(text: string): TaskPriority {
@@ -103,25 +201,54 @@ function detectPriority(text: string): TaskPriority {
 
 function cleanTitle(segment: string): string {
   let title = segment;
+
+  // 移除相对日期前缀
   title = title
     .replace(
       /^(?:明天|今天|今晚|明早|明晚|后天|大后天|下周[一二三四五六日]|周[一二三四五六日]|星期[一二三四五六日])\s*/,
       ""
     )
     .trim();
+
+  // 移除 "5.15" / "5/15" 格式日期
+  title = title.replace(/^\d{1,2}\s*[./]\s*\d{1,2}\s*/, "").trim();
+
+  // 移除中文数字日期如 "五月十五日"
+  title = title
+    .replace(
+      /^[一二三四五六七八九十廿]+\s*月\s*[一二三四五六七八九十廿]+\s*日?\s*/,
+      ""
+    )
+    .trim();
+
+  // 移除时间 (HH:MM)
   title = title
     .replace(
       /(?:下午|晚上|傍晚|上午|早上)?\s*\d{1,2}\s*[：:]\s*\d{2}\s*/,
       ""
     )
     .trim();
+
+  // 移除时间 (X点)
   title = title
-    .replace(/(?:下午|晚上|傍晚|上午|早上)?\s*\d{1,2}\s*点(?:半|钟)?\s*/, "")
+    .replace(
+      /(?:下午|晚上|傍晚|上午|早上)?\s*\d{1,2}\s*点(?:半|钟)?\s*/,
+      ""
+    )
     .trim();
+
+  // 移除完整年份日期
   title = title
-    .replace(/\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*日?\s*/, "")
+    .replace(
+      /\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*日?\s*/,
+      ""
+    )
     .trim();
-  title = title.replace(/\d{1,2}\s*月\s*\d{1,2}\s*日\s*/, "").trim();
+
+  // 移除月日格式 (5月15日 / 5月15)
+  title = title.replace(/\d{1,2}\s*月\s*\d{1,2}\s*日?\s*/, "").trim();
+
+  // 移除优先级标记
   title = title
     .replace(/[（(]\s*(?:紧急|重要|urgent|high)\s*[）)]/g, "")
     .trim();

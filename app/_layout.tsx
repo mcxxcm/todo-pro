@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
+import { requestNotificationPermissions } from '@/providers/notificationProvider';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -12,6 +14,11 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    // Request notification permissions when the app mounts
+    void requestNotificationPermissions();
+  }, []);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

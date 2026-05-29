@@ -5,6 +5,7 @@ import { NormalizedTask, TaskUpdateInput } from "@/types/task";
 import { loadTasks, saveTasks, generateId } from "@/lib/taskStorage";
 import { getCurrentIsoString } from "@/lib/time";
 import type { SourceItemType } from "@/types/source";
+import { syncTaskNotification, cancelTaskNotification } from "./notificationProvider";
 
 export async function getLocalTasks(): Promise<NormalizedTask[]> {
   return loadTasks();
@@ -21,6 +22,7 @@ export async function createLocalTask(
   });
   tasks.push(task);
   await saveTasks(tasks);
+  await syncTaskNotification(task);
   return task;
 }
 
@@ -33,6 +35,7 @@ export async function toggleLocalTask(id: string): Promise<NormalizedTask> {
   task.updatedAt = getCurrentIsoString();
   tasks[index] = task;
   await saveTasks(tasks);
+  await syncTaskNotification(task);
   return task;
 }
 
@@ -52,12 +55,14 @@ export async function updateLocalTask(
 
   tasks[index] = task;
   await saveTasks(tasks);
+  await syncTaskNotification(task);
   return task;
 }
 
 export async function deleteLocalTask(id: string): Promise<void> {
   const tasks = await loadTasks();
   await saveTasks(tasks.filter((t) => t.id !== id));
+  await cancelTaskNotification(id);
 }
 
 export async function mergeDuplicateLocalTasks(): Promise<{
@@ -107,6 +112,10 @@ export async function mergeDuplicateLocalTasks(): Promise<{
   }
 
   await saveTasks(tasks.map((task) => taskById.get(task.id) ?? task));
+
+  for (const id of archivedIds) {
+    await cancelTaskNotification(id);
+  }
 
   return {
     archived: archivedIds.size,

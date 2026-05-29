@@ -1,16 +1,37 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import { requestNotificationPermissions } from '@/providers/notificationProvider';
+import { AuthProvider, useAuth } from '@/providers/AuthContext';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    const inAuthGroup = segments[0] === 'auth';
+
+    if (!user && !inAuthGroup) {
+      router.replace('/auth');
+    } else if (user && inAuthGroup) {
+      router.replace('/');
+    }
+  }, [user, loading, segments, router]);
+
+  if (loading) return null; // Or a splash screen
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -185,12 +206,17 @@ export default function RootLayout() {
           }
         ` }} />
       )}
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        <Stack.Screen name="theme-editor" options={{ presentation: 'modal', title: '自定义主题' }} />
-        <Stack.Screen name="source-library" options={{ presentation: 'modal', title: '来源库' }} />
-      </Stack>
+      <AuthProvider>
+        <AuthGuard>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            <Stack.Screen name="theme-editor" options={{ presentation: 'modal', title: '自定义主题' }} />
+            <Stack.Screen name="source-library" options={{ presentation: 'modal', title: '来源库' }} />
+            <Stack.Screen name="auth" options={{ presentation: 'modal', title: '登录/注册', gestureEnabled: false, headerShown: false }} />
+          </Stack>
+        </AuthGuard>
+      </AuthProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
   );

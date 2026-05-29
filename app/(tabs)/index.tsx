@@ -1,246 +1,430 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
   Modal,
-  FlatList,
-  Text,
   View,
+  useWindowDimensions,
 } from "react-native";
+import { useLocalSearchParams } from "expo-router";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskExtraction } from "@/hooks/useTaskExtraction";
+// import { useImageOCR } from "@/hooks/useImageOCR";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { TaskComposer } from "@/components/TaskComposer";
 import { TaskList } from "@/components/TaskList";
-import { ReviewCard } from "@/components/ReviewCard";
+import { TaskFilterRail } from "@/components/TaskFilterRail";
+import { SourceEvidenceTray } from "@/components/SourceEvidenceTray";
+import { TaskBriefingPanel } from "@/components/TaskBriefingPanel";
+import { WorkspaceSidebar } from "@/components/WorkspaceSidebar";
+import { InboxHeader } from "@/components/inbox/InboxHeader";
+import { TimeReviewActionCard } from "@/components/inbox/TimeReviewActionCard";
+import { ReviewModalContent } from "@/components/inbox/ReviewModalContent";
+import { LiquidSurface } from "@/components/inbox/LiquidSurface";
 import { ExtractedTask } from "@/types/extraction";
+import { TaskDraft } from "@/types/draft";
+import {
+  createLocalSource,
+  deleteLocalSource,
+} from "@/providers/localSourceProvider";
 import { Colors } from "@/constants/theme";
+import { Spacing, Radius, StatusColors } from "@/constants/tokens";
+import { GlassCard } from "@/components/ui/GlassCard";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import type { SourceItemType } from "@/types/source";
+import { classifyIntake } from "@/domain/intake";
+import { buildTaskBriefing } from "@/domain/taskBriefing";
+import {
+  getTaskGroupCounts,
+  type TaskGroupFilter,
+} from "@/domain/taskGrouping";
+import { parseManualTaskInput } from "@/lib/manualTaskInput";
 
 export default function InboxScreen() {
-  const { tasks, loading, error, addTask, toggleDone, removeTask, refresh } =
+  const params = useLocalSearchParams<{
+    text?: string | string[];
+    source?: string | string[];
+  }>();
+  const { tasks, loading, error: tasksError, addTask, toggleDone, updateTask, removeTask, mergeDuplicates, confirmAllTimeReviews, refresh } =
     useTasks();
-  const { candidates, extracting, extract, confirmTask, dismissTask, confirmAll, closePanel, updateCandidate } =
+  const { candidates, extracting, error: extractionError, extract, extractFromImage, confirmTask, dismissTask, closePanel, updateCandidate, clearError } =
     useTaskExtraction();
   const [pendingSave, setPendingSave] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<TaskGroupFilter>("all");
+  const [reviewPanelVisible, setReviewPanelVisible] = useState(false);
+  const lastSharedTextRef = useRef<string | null>(null);
+  const currentIntakeTypeRef = useRef<SourceItemType>("text");
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = Colors[colorScheme];
 
-  const handleConfirm = async (task: ExtractedTask) => {
-    await addTask(task.title, {
-      dueAt: task.dueAt,
-      notes: task.dueText ? `截止: ${task.dueText}` : undefined,
-      sourceText: task.sourceText,
+  const { activeTheme } = useAppTheme();
+  const baseBgColor = activeTheme.colors[colorScheme].base;
+  const wideLayout = width >= 980;
+  const openTaskCount = tasks.filter((task) => task.status !== "done").length;
+  const sourceBackedCount = tasks.filter((task) => task.sourceId || task.sourceText).length;
+  const briefing = useMemo(() => buildTaskBriefing(tasks), [tasks]);
+  const taskGroupCounts = useMemo(() => getTaskGroupCounts(tasks), [tasks]);
+
+  const sharedText = Array.isArray(params.text) ? params.text[0] : params.text;
+  const sourceParam = Array.isArray(params.source)
+    ? params.source[0]
+    : params.source;
+
+  // --- Handlers ---
+
+  const handleExtract = useCallback(async (text: string, intakeType: SourceItemType = "text") => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const intake = classifyIntake(trimmed, intakeType);
+    currentIntakeTypeRef.current = intake.sourceType;
+    clearError();
+    const source = await createLocalSource({
+      type: intake.sourceType,
+      title: getSourceTitle(intake.titlePrefix, trimmed),
+      rawContent: trimmed,
+      origin: intake.sourceType,
+      metadata: {
+        intake: intake.sourceType,
+        length: trimmed.length,
+        ...(intake.url && { url: intake.url }),
+      },
     });
-    confirmTask(task.id);
+    await extract(trimmed, {
+      sourceId: source.id,
+      sourceType: source.type,
+    });
+  }, [clearError, extract]);
+
+  const handleManualAdd = useCallback(async (text: string) => {
+    const parsed = parseManualTaskInput(text);
+    if (!parsed) return undefined;
+    const source = await createLocalSource({
+      type: "manual",
+      title: getSourceTitle("手动输入", text.trim()),
+      rawContent: text.trim(),
+      origin: "manual",
+      metadata: {
+        intake: "manual",
+        length: text.trim().length,
+      },
+    });
+
+    const savedTask = await addTask(parsed.title, {
+      dueAt: parsed.dueAt,
+      dueText: parsed.dueText,
+      sourceId: source.id,
+      sourceText: text.trim(),
+      sourceType: source.type,
+      timeStatus: parsed.timeStatus,
+    });
+
+    if (!savedTask) {
+      await deleteLocalSource(source.id);
+    }
+
+    return savedTask;
+  }, [addTask]);
+
+  const ensureSourceForExtractedTask = async (
+    task: ExtractedTask & Partial<Pick<TaskDraft, "sourceId" | "sourceType">>,
+  ) => {
+    if (task.sourceId && task.sourceType) {
+      return { id: task.sourceId, type: task.sourceType };
+    }
+
+    const intakeType = currentIntakeTypeRef.current;
+    return createLocalSource({
+      type: intakeType,
+      title: task.title,
+      rawContent: task.sourceText,
+      origin: intakeType,
+      metadata: {
+        intake: intakeType,
+      },
+    });
+  };
+
+  const handleConfirm = async (
+    task: ExtractedTask & Partial<Pick<TaskDraft, "sourceId" | "sourceType">>,
+  ) => {
+    const source = await ensureSourceForExtractedTask(task);
+    const savedTask = await addTask(task.title, {
+      dueAt: task.dueAt,
+      dueText: task.dueText,
+      timeStatus: task.timeStatus,
+      notes: task.notes,
+      priority: task.priority,
+      sourceId: source.id,
+      sourceType: source.type,
+      sourceText: task.sourceText,
+      tags: task.tags,
+      timeConfidence: task.timeConfidence,
+    });
+    if (!savedTask) return;
+    await confirmTask(task.id, savedTask.id, {
+      dueAt: task.dueAt,
+      dueText: task.dueText,
+      notes: task.notes,
+      timeStatus: task.timeStatus,
+      title: task.title,
+    });
   };
 
   const handleConfirmAll = async () => {
     setPendingSave(true);
-    for (const t of candidates) {
-      await addTask(t.title, {
-        dueAt: t.dueAt,
-        notes: t.dueText ? `截止: ${t.dueText}` : undefined,
-        sourceText: t.sourceText,
-      });
+    try {
+      for (const t of candidates) {
+        const source = await ensureSourceForExtractedTask(t);
+        const savedTask = await addTask(t.title, {
+          dueAt: t.dueAt,
+          dueText: t.dueText,
+          timeStatus: t.dueText ? t.timeStatus ?? "needs_review" : "none",
+          notes: t.notes,
+          priority: t.priority,
+          sourceId: source.id,
+          sourceType: source.type,
+          sourceText: t.sourceText,
+          tags: t.tags,
+          timeConfidence: t.timeConfidence,
+        });
+        if (!savedTask) continue;
+        await confirmTask(t.id, savedTask.id, {
+          dueAt: t.dueAt,
+          dueText: t.dueText,
+          notes: t.notes,
+          timeStatus: t.timeStatus,
+          title: t.title,
+        });
+      }
+    } finally {
+      setPendingSave(false);
     }
-    setPendingSave(false);
-    confirmAll();
   };
 
-  if (error) {
+  const handleCloseReview = useCallback(() => {
+    setReviewPanelVisible(false);
+    void closePanel();
+  }, [closePanel]);
+
+  // --- Effects ---
+
+  useEffect(() => {
+    if (candidates.length > 0) {
+      setReviewPanelVisible(true);
+    }
+  }, [candidates.length]);
+
+  useEffect(() => {
+    const normalizedSharedText = sharedText?.trim();
+    if (
+      !normalizedSharedText ||
+      lastSharedTextRef.current === normalizedSharedText
+    ) {
+      return;
+    }
+
+    lastSharedTextRef.current = normalizedSharedText;
+    void handleExtract(
+      normalizedSharedText,
+      sourceParam === "share" ? "share" : "text",
+    );
+  }, [handleExtract, sharedText, sourceParam]);
+
+  // --- Error state ---
+
+  if (tasksError) {
     return (
       <SafeAreaView
         style={[styles.container, { backgroundColor: colors.background }]}
       >
         <ThemedView style={styles.errorContainer}>
-          <ThemedText style={styles.errorText}>{error}</ThemedText>
-          <TouchableOpacity onPress={refresh} style={styles.retryButton}>
-            <ThemedText type="link">重试</ThemedText>
-          </TouchableOpacity>
+          <GlassCard style={styles.errorCard}>
+            <MaterialIcons
+              name="error-outline"
+              size={32}
+              color={StatusColors.danger}
+              style={styles.errorIcon}
+            />
+            <ThemedText style={styles.errorText}>{tasksError}</ThemedText>
+            <TouchableOpacity onPress={refresh} style={styles.retryButton}>
+              <ThemedText type="link">重试</ThemedText>
+            </TouchableOpacity>
+          </GlassCard>
         </ThemedView>
       </SafeAreaView>
     );
   }
 
+  // --- Main render ---
+
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: baseBgColor }]}
     >
-      <ThemedView style={styles.header}>
-        <ThemedText type="title" style={styles.headerTitle}>
-          Todo Pro
-        </ThemedText>
-        <ThemedText style={styles.headerSubtitle}>
-          多形式内容的 AI 任务收件箱
-        </ThemedText>
-      </ThemedView>
+      <LiquidSurface baseColor={baseBgColor} />
 
-      <TaskComposer onAdd={addTask} onExtract={extract} extracting={extracting} />
+      <View style={[styles.workspace, wideLayout && styles.workspaceWide]}>
+        {wideLayout && (
+          <WorkspaceSidebar
+            activeFilter={activeFilter}
+            draftCount={candidates.length}
+            onFilterChange={setActiveFilter}
+            onReviewPress={() => setReviewPanelVisible(true)}
+            tasks={tasks}
+          />
+        )}
 
-      <TaskList
-        tasks={tasks}
-        loading={loading}
-        onToggle={toggleDone}
-        onDelete={removeTask}
-      />
+        <View style={styles.mainPane}>
+          <InboxHeader
+            draftCount={candidates.length}
+            openTaskCount={openTaskCount}
+            sourceBackedCount={sourceBackedCount}
+            taskCount={tasks.length}
+            wideLayout={wideLayout}
+          />
+
+          <TaskList
+            header={
+              <>
+                <TaskComposer
+                  onAdd={handleManualAdd}
+                  onExtract={(text) => handleExtract(text, "text")}
+                  extracting={extracting}
+                  onImagePicked={extractFromImage}
+                  ocrScanning={extracting} // Using extracting state for both now
+                />
+
+                <TaskBriefingPanel
+                  briefing={briefing}
+                  onMergeDuplicates={mergeDuplicates}
+                  tasks={tasks}
+                />
+
+                {!wideLayout && (
+                  <TaskFilterRail
+                    activeFilter={activeFilter}
+                    counts={taskGroupCounts}
+                    onFilterChange={setActiveFilter}
+                  />
+                )}
+
+                {activeFilter === "needsReview" && taskGroupCounts.needsReview > 0 && (
+                  <TimeReviewActionCard
+                    count={taskGroupCounts.needsReview}
+                    onConfirmAll={() => void confirmAllTimeReviews()}
+                  />
+                )}
+
+                {!!extractionError && (
+                  <ThemedView style={styles.extractErrorBanner}>
+                    <MaterialIcons
+                      name="error-outline"
+                      size={16}
+                      color={StatusColors.danger}
+                    />
+                    <ThemedText style={styles.extractErrorText}>
+                      {extractionError}
+                    </ThemedText>
+                  </ThemedView>
+                )}
+              </>
+            }
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            tasks={tasks}
+            loading={loading}
+            onToggle={toggleDone}
+            onUpdate={updateTask}
+            onDelete={removeTask}
+          />
+
+          <SourceEvidenceTray tasks={tasks} candidates={candidates} />
+        </View>
+      </View>
 
       <Modal
-        visible={candidates.length > 0}
+        visible={reviewPanelVisible && candidates.length > 0}
         animationType="slide"
         transparent
-        onRequestClose={closePanel}
+        onRequestClose={handleCloseReview}
       >
-        <View style={styles.modalOverlay}>
-          <ThemedView
-            style={[
-              styles.modalSheet,
-              {
-                borderColor: colors.icon,
-              },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>
-                候选任务 ({candidates.length})
-              </ThemedText>
-              <TouchableOpacity onPress={closePanel} activeOpacity={0.7}>
-                <ThemedText style={styles.modalClose}>关闭</ThemedText>
-              </TouchableOpacity>
-            </View>
-
-            <FlatList
-              data={candidates}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <ReviewCard
-                  task={item}
-                  onConfirm={handleConfirm}
-                  onDismiss={dismissTask}
-                  onFieldChange={updateCandidate}
-                />
-              )}
-              style={styles.cardList}
-              contentContainerStyle={styles.cardListContent}
-              ListEmptyComponent={
-                <ThemedText style={styles.emptyText}>
-                  暂未识别到任务
-                </ThemedText>
-              }
-            />
-
-            {candidates.length > 1 && (
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={[
-                    styles.confirmAllButton,
-                    { backgroundColor: colors.tint },
-                  ]}
-                  onPress={handleConfirmAll}
-                  disabled={pendingSave}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.confirmAllText}>
-                    {pendingSave ? "保存中..." : `全部确认 (${candidates.length})`}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </ThemedView>
-        </View>
+        <ReviewModalContent
+          candidates={candidates}
+          onClose={handleCloseReview}
+          onConfirm={handleConfirm}
+          onConfirmAll={handleConfirmAll}
+          onDismiss={(taskId) => void dismissTask(taskId)}
+          onFieldChange={updateCandidate}
+          pendingSave={pendingSave}
+        />
       </Modal>
     </SafeAreaView>
   );
+}
+
+function getSourceTitle(prefix: string, text: string) {
+  return `${prefix}: ${text.slice(0, 28)}`;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 20,
+  workspace: {
+    flex: 1,
+  },
+  workspaceWide: {
+    flexDirection: "row",
+    gap: 18,
+    paddingHorizontal: 22,
     paddingTop: 16,
-    paddingBottom: 8,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    marginTop: 4,
-    opacity: 0.6,
+  mainPane: {
+    flex: 1,
+    minWidth: 0,
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: Spacing.lg,
+  },
+  errorCard: {
+    alignItems: "center",
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.xxl,
+  },
+  errorIcon: {
+    marginBottom: Spacing.sm,
   },
   errorText: {
     fontSize: 15,
     textAlign: "center",
-    marginBottom: 12,
+    marginBottom: Spacing.sm,
   },
   retryButton: {
-    padding: 8,
+    padding: Spacing.xs,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
-  modalSheet: {
-    maxHeight: "80%",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 16,
-  },
-  modalHeader: {
+  extractErrorBanner: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: `${StatusColors.danger}1A`,
+    marginBottom: Spacing.xxs,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  modalClose: {
-    fontSize: 15,
-    opacity: 0.6,
-  },
-  cardList: {
-    flexGrow: 0,
-  },
-  cardListContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  emptyText: {
-    textAlign: "center",
-    paddingVertical: 40,
-    opacity: 0.5,
-    fontSize: 15,
-  },
-  modalFooter: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    paddingBottom: 32,
-  },
-  confirmAllButton: {
-    height: 48,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  confirmAllText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
+  extractErrorText: {
+    flex: 1,
+    fontSize: 13,
+    color: StatusColors.danger,
   },
 });

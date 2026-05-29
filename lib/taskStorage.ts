@@ -1,18 +1,21 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loadJsonArray, removeJsonValue, saveJsonArray } from "@/lib/jsonStorage";
+import { createLocalId } from "@/lib/localId";
 import { NormalizedTask } from "@/types/task";
 
 const STORAGE_KEY = "todo_pro_tasks";
 
 export async function loadTasks(): Promise<NormalizedTask[]> {
-  const json = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!json) return [];
-  return JSON.parse(json);
+  return loadJsonArray<NormalizedTask>(STORAGE_KEY);
 }
 
 export async function saveTasks(tasks: NormalizedTask[]): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  await saveJsonArray(STORAGE_KEY, tasks);
+}
+
+export async function clearTasks(): Promise<void> {
+  await removeJsonValue(STORAGE_KEY);
 }
 
 export function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  return createLocalId();
 }

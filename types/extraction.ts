@@ -1,4 +1,4 @@
-import { TaskPriority, TimeConfidence } from "./task";
+import { TaskPriority, TimeConfidence, TimeStatus } from "./task";
 
 export interface ExtractedTask {
   id: string;
@@ -10,6 +10,7 @@ export interface ExtractedTask {
   tags: string[];
   notes?: string;
   timeConfidence: TimeConfidence;
+  timeStatus?: TimeStatus;
   /** 0 (least confident) to 1 (most confident) */
   confidence?: number;
 }

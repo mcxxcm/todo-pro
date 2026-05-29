@@ -1,46 +1,76 @@
 import { Extractor } from "./types";
 import { ExtractedTask, ExtractionResult } from "@/types/extraction";
-import { TimeConfidence, TaskPriority } from "@/types/task";
+import { TaskPriority } from "@/types/task";
 
 const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
 const CN_DIGITS: Record<string, number> = {
-  一: 1, 二: 2, 三: 3, 四: 4, 五: 5,
+  零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5,
   六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
   廿: 20,
 };
+const CN_NUMBER_PATTERN = "[零〇一二两三四五六七八九十廿]+";
+const SOURCE_HEADER_PATTERN =
+  /^(subject|from|to|date|cc|bcc|发件人|收件人|抄送|主题|日期)\s*[:：]/i;
+const URL_ONLY_PATTERN = /^https?:\/\/\S+$/i;
+const ACTION_HINT_PATTERN = /[会要去到做买看找取送交联系确认提交完成处理整理准备预约回复玩写吃读]/;
 
 // -- Helpers -----------------------------------------------------------------
 
 function parseChineseNumber(s: string): number | null {
   if (s in CN_DIGITS) return CN_DIGITS[s];
-  const tens = s.match(/^十([一二三四五六七八九])?$/);
+  const normalized = s.replace(/两/g, "二");
+  const tens = normalized.match(/^十([一二三四五六七八九])?$/);
   if (tens) return 10 + (tens[1] ? CN_DIGITS[tens[1]] : 0);
-  const twenties = s.match(/^二十([一二三四五六七八九])?$/);
+  const twenties = normalized.match(/^二十([一二三四五六七八九])?$/);
   if (twenties) return 20 + (twenties[1] ? CN_DIGITS[twenties[1]] : 0);
-  const thirties = s.match(/^三十([一二三四五六七八九])?$/);
+  const thirties = normalized.match(/^三十([一二三四五六七八九])?$/);
   if (thirties) return 30 + (thirties[1] ? CN_DIGITS[thirties[1]] : 0);
   return null;
+}
+
+function parseHourValue(value: string): number | null {
+  if (/^\d{1,2}$/.test(value)) return parseInt(value, 10);
+  return parseChineseNumber(value);
+}
+
+function normalizeHour(hour: number, text: string): number {
+  if (/凌晨/.test(text)) return hour === 12 ? 0 : hour;
+  if (/中午/.test(text)) return hour < 11 ? hour + 12 : hour;
+  if (/下午|晚上|傍晚|今晚|明晚/.test(text) && hour < 12) return hour + 12;
+  return hour;
 }
 
 function extractTimeFromText(
   text: string
 ): { hour: number; minute: number } | null {
   const timeMatch = text.match(
-    /(?:下午|晚上|傍晚|上午|早上)?\s*(\d{1,2})\s*[：:](\d{2})/
+    /(?:凌晨|下午|晚上|傍晚|上午|早上|中午)?\s*(\d{1,2})\s*[：:](\d{2})/
   );
   if (timeMatch) {
-    let h = parseInt(timeMatch[1]);
+    let h = normalizeHour(parseInt(timeMatch[1]), text);
     const m = parseInt(timeMatch[2]);
-    if (/下午|晚上|傍晚/.test(text) && h < 12) h += 12;
     return { hour: h, minute: m };
   }
   const hourMatch = text.match(
-    /(?:下午|晚上|傍晚|上午|早上)?\s*(\d{1,2})\s*点/
+    new RegExp(
+      `(?:凌晨|下午|晚上|傍晚|上午|早上|中午|今晚|明早|明晚)?\\s*(\\d{1,2}|${CN_NUMBER_PATTERN})\\s*点\\s*(半|一刻|三刻|\\d{1,2}|${CN_NUMBER_PATTERN})?`
+    )
   );
   if (hourMatch) {
-    let h = parseInt(hourMatch[1]);
-    if (/下午|晚上|傍晚/.test(text) && h < 12) h += 12;
-    return { hour: h, minute: 0 };
+    const parsedHour = parseHourValue(hourMatch[1]);
+    if (parsedHour === null || parsedHour > 24) return null;
+
+    const minuteText = hourMatch[2];
+    let minute = 0;
+    if (minuteText === "半") minute = 30;
+    else if (minuteText === "一刻") minute = 15;
+    else if (minuteText === "三刻") minute = 45;
+    else if (minuteText) {
+      const parsedMinute = parseHourValue(minuteText);
+      minute = parsedMinute === null ? 0 : Math.max(0, Math.min(59, parsedMinute));
+    }
+
+    return { hour: normalizeHour(parsedHour, text), minute };
   }
   return null;
 }
@@ -232,7 +262,9 @@ function cleanTitle(segment: string): string {
   // 移除时间 (X点)
   title = title
     .replace(
-      /(?:下午|晚上|傍晚|上午|早上)?\s*\d{1,2}\s*点(?:半|钟)?\s*/,
+      new RegExp(
+        `(?:凌晨|下午|晚上|傍晚|上午|早上|中午|今晚|明早|明晚)?\\s*(?:\\d{1,2}|${CN_NUMBER_PATTERN})\\s*点(?:半|一刻|三刻|钟|\\d{1,2}|${CN_NUMBER_PATTERN})?\\s*`
+      ),
       ""
     )
     .trim();
@@ -251,6 +283,7 @@ function cleanTitle(segment: string): string {
   // 移除优先级标记
   title = title
     .replace(/[（(]\s*(?:紧急|重要|urgent|high)\s*[）)]/g, "")
+    .replace(/^(前|之前|以前|内|之内)\s*/, "")
     .trim();
 
   return title || segment;
@@ -269,7 +302,8 @@ function splitIntoSegments(text: string): string[] {
   const lines = text
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+    .filter((l) => l.length > 0)
+    .filter((l) => !SOURCE_HEADER_PATTERN.test(l));
 
   const segments: string[] = [];
 
@@ -317,6 +351,12 @@ function computeConfidence(text: string, hasDate: boolean): number {
   return 0.6;
 }
 
+function isActionableSegment(text: string, hasDate: boolean): boolean {
+  if (hasDate) return true;
+  if (URL_ONLY_PATTERN.test(text.trim())) return false;
+  return ACTION_HINT_PATTERN.test(text);
+}
+
 // -- Task ID ----------------------------------------------------------------
 
 let idCounter = 0;
@@ -344,25 +384,67 @@ export class MockExtractor implements Extractor {
       return { tasks: [], rawText: text };
     }
 
-    const tasks: ExtractedTask[] = segments.map((segment) => {
-      const dateInfo = parseDateInfo(segment);
-      const title = cleanTitle(segment);
-      const confidence = computeConfidence(segment, !!dateInfo);
+    const tasks: ExtractedTask[] = segments.flatMap((segment) => {
+        const dateInfo = parseDateInfo(segment);
+        if (!isActionableSegment(segment, !!dateInfo)) return [];
 
-      return {
-        id: nextId(),
-        title,
-        sourceText: segment,
-        dueText: dateInfo?.dueText,
-        dueAt: dateInfo?.dueAt,
-        priority: detectPriority(segment),
-        tags: [],
-        timeConfidence: dateInfo?.dueAt ? "medium" : "none",
-        needsConfirmation: true,
-        confidence,
-      };
-    });
+        const title = cleanTitle(segment);
+        const confidence = computeConfidence(segment, !!dateInfo);
+
+        const task: ExtractedTask = {
+          id: nextId(),
+          title,
+          sourceText: segment,
+          dueText: dateInfo?.dueText,
+          dueAt: dateInfo?.dueAt,
+          priority: detectPriority(segment),
+          tags: [],
+          timeConfidence: dateInfo?.dueAt ? "medium" : "none",
+          timeStatus: dateInfo?.dueText ? "needs_review" : "none",
+          confidence,
+        };
+        return [task];
+      });
 
     return { tasks, rawText: text };
+  }
+
+  async extractFromImage(imageBase64: string): Promise<ExtractionResult & { ocrText: string }> {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    
+    const ocrText = "明天下午3点前联系老师确认论文题目\n下周五提交报告";
+    
+    return {
+      ocrText,
+      rawText: ocrText,
+      tasks: [
+        {
+          id: nextId(),
+          title: "联系老师确认论文题目",
+          sourceText: ocrText,
+          dueAt: undefined,
+          dueText: "明天下午3点前",
+          notes: undefined,
+          timeStatus: "needs_review",
+          timeConfidence: "medium",
+          priority: "none",
+          tags: [],
+          confidence: 0.95,
+        },
+        {
+          id: nextId(),
+          title: "提交报告",
+          sourceText: ocrText,
+          dueAt: undefined,
+          dueText: "下周五",
+          notes: undefined,
+          timeStatus: "needs_review",
+          timeConfidence: "medium",
+          priority: "none",
+          tags: [],
+          confidence: 0.9,
+        },
+      ],
+    };
   }
 }

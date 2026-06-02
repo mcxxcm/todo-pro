@@ -1,6 +1,6 @@
 import { buildTodoistTaskPayload } from "@/domain/todoistExport";
 import type { TaskSyncProvider } from "@/types/sync";
-import { getTodoistToken } from "@/lib/todoistStorage";
+import { getEffectiveTodoistToken } from "@/lib/todoistStorage";
 
 export const todoistSyncProvider: TaskSyncProvider = {
   available: true,
@@ -8,7 +8,7 @@ export const todoistSyncProvider: TaskSyncProvider = {
   provider: "todoist",
   async syncTask(_task, payload) {
     const todoistPayload = buildTodoistTaskPayload(payload);
-    const token = await getTodoistToken();
+    const token = await getEffectiveTodoistToken();
 
     if (token && token.trim()) {
       try {

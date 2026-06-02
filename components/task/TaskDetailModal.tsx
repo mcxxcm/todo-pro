@@ -77,6 +77,8 @@ export function TaskDetailModal({
   const [editDecomposeIndex, setEditDecomposeIndex] = useState<number | null>(null);
   const [editDecomposeTitle, setEditDecomposeTitle] = useState("");
   const [editDecomposeMins, setEditDecomposeMins] = useState("");
+  const [editingActual, setEditingActual] = useState(false);
+  const [quickActualMins, setQuickActualMins] = useState("");
 
   const resetToTask = () => {
     setTitle(task.title);
@@ -88,6 +90,8 @@ export function TaskDetailModal({
     setSubtasks(task.subtasks ?? []);
     setEstimatedMinutes(task.estimatedMinutes?.toString() ?? "");
     setActualMinutes(task.actualMinutes?.toString() ?? "");
+    setEditingActual(false);
+    setQuickActualMins("");
   };
 
   const handleStartEditing = () => {
@@ -500,7 +504,28 @@ export function TaskDetailModal({
               )}
 
               {decomposeError && (
-                <Text style={[styles.errorText, { color: StatusColors.danger }]}>{decomposeError}</Text>
+                <View style={styles.decomposeErrorRow}>
+                  <Text style={[styles.errorText, { color: StatusColors.danger, flex: 1 }]}>
+                    {decomposeError}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={handleDecompose}
+                    style={[styles.retryBtn, { borderColor: StatusColors.danger + "60" }]}
+                    accessibilityLabel="重试 AI 拆解"
+                  >
+                    <MaterialIcons name="refresh" size={14} color={StatusColors.danger} />
+                    <Text style={[styles.retryBtnText, { color: StatusColors.danger }]}>重试</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {decompositionResult !== null && decompositionResult.length === 0 && (
+                <View style={[styles.emptyDecomposeCard, { backgroundColor: colors.tint + "0A", borderColor: colors.tint + "30" }]}>
+                  <MaterialIcons name="info-outline" size={16} color={colors.tint} />
+                  <Text style={[styles.emptyDecomposeText, { color: colors.text }]}>
+                    AI 认为该任务已经足够具体，无需进一步拆解。
+                  </Text>
+                </View>
               )}
 
               {decompositionResult && decompositionResult.length > 0 && (
@@ -654,7 +679,53 @@ export function TaskDetailModal({
                   keyboardType="numeric"
                 />
               ) : task.actualMinutes ? (
-                <Text style={[styles.valueText, { color: colors.text }]}>{task.actualMinutes} 分钟</Text>
+                editingActual ? (
+                  <View style={styles.quickActualRow}>
+                    <TextInput
+                      value={quickActualMins}
+                      onChangeText={setQuickActualMins}
+                      style={[styles.quickActualInput, { color: colors.text, borderColor: Glass.border[colorScheme] }]}
+                      placeholder="实际用时"
+                      placeholderTextColor={colors.icon}
+                      keyboardType="numeric"
+                    />
+                    <TouchableOpacity
+                      onPress={() => {
+                        const mins = parseInt(quickActualMins, 10);
+                        if (isNaN(mins) || mins <= 0 || mins > 1440) {
+                          Alert.alert("输入无效", "实际用时必须在 1 至 1440 分钟（24小时）之间。");
+                          return;
+                        }
+                        void onUpdate(task.id, { actualMinutes: mins });
+                        setEditingActual(false);
+                      }}
+                      style={[styles.quickActualSave, { backgroundColor: colors.tint }]}
+                      accessibilityLabel="保存实际耗时"
+                    >
+                      <Text style={[styles.quickActualSaveText, colorScheme === "dark" && { color: "#11181C" }]}>保存</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setEditingActual(false)}
+                      style={[styles.quickActualSave, { borderColor: Glass.border[colorScheme], borderWidth: StyleSheet.hairlineWidth }]}
+                      accessibilityLabel="取消修改"
+                    >
+                      <Text style={{ color: colors.icon, fontSize: 12, fontWeight: "800" }}>取消</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.valueRow}>
+                    <Text style={[styles.valueText, { color: colors.text }]}>{task.actualMinutes} 分钟</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setQuickActualMins(task.actualMinutes?.toString() ?? "");
+                        setEditingActual(true);
+                      }}
+                      accessibilityLabel="修改实际耗时"
+                    >
+                      <MaterialIcons name="edit" size={14} color={colors.tint} />
+                    </TouchableOpacity>
+                  </View>
+                )
               ) : task.status === "done" ? (
                 <View style={styles.quickActualRow}>
                   <TextInput
@@ -668,10 +739,12 @@ export function TaskDetailModal({
                   <TouchableOpacity
                     onPress={() => {
                       const mins = parseInt(actualMinutes, 10);
-                      if (mins > 0) {
-                        void onUpdate(task.id, { actualMinutes: mins });
-                        setActualMinutes("");
+                      if (isNaN(mins) || mins <= 0 || mins > 1440) {
+                        Alert.alert("输入无效", "实际用时必须在 1 至 1440 分钟（24小时）之间。");
+                        return;
                       }
+                      void onUpdate(task.id, { actualMinutes: mins });
+                      setActualMinutes("");
                     }}
                     disabled={!actualMinutes.trim()}
                     style={[styles.quickActualSave, { backgroundColor: colors.tint, opacity: actualMinutes.trim() ? 1 : 0.4 }]}
@@ -701,6 +774,31 @@ export function TaskDetailModal({
                 <Text style={[styles.valueText, { color: colors.icon }]}>不重复</Text>
               )}
             </View>
+
+            {/* Focus History */}
+            {!editing && task.focusSessions && task.focusSessions.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: colors.tint }]}>专注历史</Text>
+                <View style={styles.focusHistoryContainer}>
+                  {task.focusSessions.map((session, index) => (
+                    <View key={index} style={[styles.focusSessionRow, { borderColor: Glass.border[colorScheme] }]}>
+                      <MaterialIcons name="timer" size={14} color={colors.tint} />
+                      <Text style={[styles.focusSessionText, { color: colors.text }]}>
+                        {new Date(session.startedAt).toLocaleString("zh-CN", {
+                          month: "numeric",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                      <Text style={[styles.focusSessionDuration, { color: colors.icon }]}>
+                        专注 {session.durationMinutes} 分钟
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Source info */}
             {task.sourceId && (
@@ -1143,6 +1241,62 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "800",
+  },
+  decomposeErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: 4,
+  },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: StatusColors.danger,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  retryBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  emptyDecomposeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+    marginTop: 4,
+  },
+  emptyDecomposeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 16,
+  },
+  focusHistoryContainer: {
+    gap: 4,
+    marginTop: 2,
+  },
+  focusSessionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 6,
+  },
+  focusSessionText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  focusSessionDuration: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
   },
 });
 

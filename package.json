@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test:ui": "jest components/__tests__ --runInBand",
-    "test:all": "npm run test:calendar-export && npm run test:client-time && npm run test:components && npm run test:extraction-api && npm run test:intake && npm run test:local-data-export && npm run test:local-data-quality && npm run test:manual-task-input && npm run test:migration && npm run test:mock-extractor && npm run test:reminders-export && npm run test:source-timeline && npm run test:sync-preflight && npm run test:sync-records && npm run test:task-briefing && npm run test:task-duplicates && npm run test:task-export && npm run test:task-drafts && npm run test:task-grouping && npm run test:tasks && npm run test:time-consistency && npm run test:todoist-export",
+    "test:all": "npm run test:calendar-export && npm run test:client-time && npm run test:components && npm run test:extraction-api && npm run test:firebase-conflict && npm run test:intake && npm run test:local-data-export && npm run test:local-data-quality && npm run test:manual-task-input && npm run test:migration && npm run test:mock-extractor && npm run test:reminders-export && npm run test:source-timeline && npm run test:sync-preflight && npm run test:sync-records && npm run test:task-briefing && npm run test:task-duplicates && npm run test:task-export && npm run test:task-drafts && npm run test:task-grouping && npm run test:tasks && npm run test:time-consistency && npm run test:todoist-export",
     "test:calendar-export": "backend/node_modules/.bin/tsx domain/calendarExport.test.ts",
     "test:client-time": "backend/node_modules/.bin/tsx lib/clientTimeParser.test.ts",
     "test:components": "backend/node_modules/.bin/tsx components/__tests__/components.test.ts",
@@ -32,6 +32,7 @@
     "test:tasks": "backend/node_modules/.bin/tsx domain/tasks.test.ts",
     "test:sync-records": "backend/node_modules/.bin/tsx domain/syncRecords.test.ts",
     "test:todoist-export": "backend/node_modules/.bin/tsx domain/todoistExport.test.ts",
+    "test:firebase-conflict": "backend/node_modules/.bin/tsx domain/firebaseConflict.test.ts",
     "test:time-consistency": "backend/node_modules/.bin/tsx domain/timeConsistency.test.ts"
   },
   "dependencies": {

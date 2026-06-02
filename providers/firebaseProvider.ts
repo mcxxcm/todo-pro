@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, query, writeBatch } from "firebase/firestore";
+import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, getDoc, query, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/providers/AuthContext";
 import { createNormalizedTask, CreateTaskExtra } from "@/domain/tasks";
 import { computeNextOccurrence } from "@/domain/recurrence";
+import { detectFirebaseConflict, FirebaseConflictError } from "@/domain/firebaseConflict";
 import { NormalizedTask, TaskUpdateInput } from "@/types/task";
 import { generateId } from "@/lib/taskStorage";
 import { getCurrentIsoString } from "@/lib/time";
@@ -69,12 +70,28 @@ export function useFirebaseTasks() {
     [user]
   );
 
+  const checkConflict = useCallback(
+    async (id: string, localUpdatedAt: string) => {
+      if (!user) return;
+      const taskRef = doc(db, "users", user.uid, "tasks", id);
+      const remoteSnap = await getDoc(taskRef);
+      const remoteUpdatedAt = remoteSnap.exists() ? (remoteSnap.data() as NormalizedTask).updatedAt : null;
+      const conflict = detectFirebaseConflict(localUpdatedAt, remoteUpdatedAt);
+      if (conflict.hasConflict && conflict.remoteUpdatedAt) {
+        throw new FirebaseConflictError(id, localUpdatedAt, conflict.remoteUpdatedAt);
+      }
+    },
+    [user],
+  );
+
   const toggleDone = useCallback(
     async (id: string) => {
       if (!user) return;
       try {
         const task = tasks.find((t) => t.id === id);
         if (!task) return;
+
+        await checkConflict(id, task.updatedAt);
         
         const newStatus = task.status === "done" ? "todo" : "done";
         const taskRef = doc(db, "users", user.uid, "tasks", id);
@@ -111,13 +128,16 @@ export function useFirebaseTasks() {
         setError(e instanceof Error ? e.message : "Failed to toggle task");
       }
     },
-    [user, tasks]
+    [user, tasks, checkConflict]
   );
 
   const updateTask = useCallback(
     async (id: string, patch: TaskUpdateInput) => {
       if (!user) return;
       try {
+        const existingTask = tasks.find((t) => t.id === id);
+        if (existingTask) await checkConflict(id, existingTask.updatedAt);
+
         const taskRef = doc(db, "users", user.uid, "tasks", id);
         const normalized = normalizeTaskPatch(patch);
         await updateDoc(taskRef, {
@@ -126,15 +146,14 @@ export function useFirebaseTasks() {
         });
         
         // Re-sync notification using updated state
-        const task = tasks.find((t) => t.id === id);
-        if (task) {
-          await syncTaskNotification({ ...task, ...normalized, updatedAt: getCurrentIsoString() } as NormalizedTask);
+        if (existingTask) {
+          await syncTaskNotification({ ...existingTask, ...normalized, updatedAt: getCurrentIsoString() } as NormalizedTask);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to update task");
       }
     },
-    [user, tasks]
+    [user, tasks, checkConflict]
   );
 
   const removeTask = useCallback(

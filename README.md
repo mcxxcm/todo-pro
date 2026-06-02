@@ -27,7 +27,13 @@ User text / share / OCR
 
 User-provided URLs are classified as `link` sources when pasted or shared. The app only stores the provided URL/text; it does not crawl or read pages in the background.
 
-The sync layer currently supports a real local provider that writes sync audit records. Calendar has a tested ICS export format layer, Todoist has a tested REST payload format layer, and Apple Reminders has a tested reminder payload format layer. Actual external writes remain skipped until explicit authorization and conflict handling are implemented.
+The sync layer supports real external writes to Calendar, Apple Reminders, and Todoist:
+
+- **Calendar** — real writes via `expo-calendar`. Requests `Calendar` permission on first sync; creates a "Todo Pro" calendar if none exists; writes events with title, date, and notes. Skipped on web and when permission is denied.
+- **Apple Reminders** — real writes via `expo-calendar` (iOS only). Requests `Reminders` permission; creates a "Todo Pro" reminder list; writes reminders with title, due date, and notes.
+- **Todoist** — real REST API writes when a Personal API Token is configured in Settings > Integrations. Falls back to a simulated sync when no token is present. OAuth 2.0 authorization is planned for Phase 3.
+
+All sync operations produce auditable `SyncRecord` entries with status (`synced` / `failed` / `skipped`), visible in the Settings data panel.
 
 ## App
 
@@ -120,11 +126,37 @@ The backend exposes:
 - `POST /api/extract-tasks` with `{ "text": "..." }`
 - `POST /api/ocr` with `{ "image": "<base64>" }`
 
-The current app keeps external sync in a safe planned state: local storage is active, while Apple Reminders, Calendar, and Todoist are shown as future authorization-backed targets. No external service is written to without a later explicit integration.
+The app supports real external sync to Calendar, Apple Reminders (iOS), and Todoist (with token). Each external write produces a SyncRecord audit entry. No external service is written to without explicit user authorization (permission grant or token entry).
+
+## macOS OCR Claw
+
+One-key screenshot → OCR → AI extract → Firebase sync. Located in `mac-tools/ocr-claw.ts`.
+
+```bash
+# Set required env vars (add to project root .env):
+# TODO_PRO_EMAIL=your_firebase_email
+# TODO_PRO_PASSWORD=your_firebase_password
+# TODO_PRO_BACKEND_URL=http://localhost:8787
+
+# Full-screen capture and sync
+npx tsx mac-tools/ocr-claw.ts
+
+# Region selection
+npx tsx mac-tools/ocr-claw.ts -i
+
+# OCR only, no Firebase sync
+npx tsx mac-tools/ocr-claw.ts --no-sync
+
+# Use existing image file
+npx tsx mac-tools/ocr-claw.ts -p /path/to/screenshot.png
+
+# Bash wrapper for Raycast/Hammerspoon
+mac-tools/ocr-claw.sh
+```
 
 ## Internationalization
 
-当前仅支持中文（zh-CN）。UI 文本、日期格式和错误消息均为中文。多语言支持（i18n）计划在 Phase 4 实现。
+当前默认中文（zh-CN）。i18n 基础设施已就绪（`lib/i18n/`），支持 zh/en 翻译键和 `I18nContext`。英文翻译已编写，组件迁移进行中。详见 `docs/i18n-strategy.md`。
 
 ## Time Parser Architecture
 
@@ -148,9 +180,11 @@ Run these checks before handing off changes:
 
 ```bash
 npm run test:all
+npm run test:ui
 npx tsc --noEmit
 npx eslint . --no-cache
-cd backend && npm run test:all && npx tsc --noEmit && npm run build
+npm --prefix backend run test:all
+npm --prefix backend run build
 ```
 
 ## Product Guardrails
@@ -174,21 +208,24 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 - Mock extraction hygiene: active. Source headers, standalone URLs, and non-actionable titles are filtered from task candidates.
 - Sync audit layer: active. Local provider writes records; repeated sync is skipped instead of duplicated.
 - Storage engine: currently AsyncStorage (key-value). SQLite migration is recommended when task count exceeds 500; AsyncStorage loads all tasks into memory on each read, while SQLite supports indexed queries and pagination for better performance at scale.
-- Calendar/Reminders/Todoist: payload/format layers are tested, but real external writes are intentionally skipped until user authorization and conflict handling are implemented. Todoist 当前使用 Personal API Token（设置 > 集成 > Developer）；OAuth 2.0 授权集成计划在 Phase 3。
+- Calendar: real event creation via `expo-calendar` with permission flow. Sync records are generated per write. Skipped on web or when permission denied.
+- Apple Reminders: real reminder creation via `expo-calendar` (iOS only) with permission flow. Sync records are generated per write.
+- Todoist: real REST API writes when Personal API Token is configured; mock otherwise. OAuth 2.0 授权集成计划在 Phase 3。
 - Privacy controls: active. Settings can count, clear, and create an export snapshot for local data.
 - Focus Mode / Pomodoro: active with local focus sessions, total statistics. Background and lock screen notifications are planned for Phase 3.
 
 
-## Firebase Sync (Last-Write-Wins)
+## Firebase Sync (Conflict Detection)
 
-Firebase Firestore 实时同步采用 **last-write-wins** 冲突策略：
+Firebase Firestore 实时同步采用 `updatedAt` 冲突检测策略：
 
 - 每个任务作为一个 Firestore document 存储在 `users/{uid}/tasks/{taskId}`。
-- 写入操作（`setDoc` / `updateDoc`）直接覆盖对应 document，不进行字段级合并。
 - 读操作通过 `onSnapshot` 实时监听变更，本地状态即时同步。
-- 多设备同时修改同一任务时，最后到达服务端的写入为最终状态，先前的写入会被覆盖。
+- 写入操作（`updateDoc` / `setDoc`）前会通过 `getDoc` 读取服务端当前 `updatedAt`，与本地预期值比较。
+- 若服务端 `updatedAt` 严格晚于本地，抛出 `FirebaseConflictError`，阻止静默覆盖。
+- 无冲突时执行正常写入，覆盖对应 document。
 
 **使用建议：**
-- 避免多设备短时间内同时编辑同一任务。
+- 冲突时重新加载任务数据后重试编辑。
 - 离线修改在网络恢复后自动同步到 Firestore，以设备最后写入时间为准。
-- 如需更细粒度的冲突检测（如字段级合并或 CRDT），请在 Phase 2 评估。
+- 冲突检测记录可追踪，详见 `domain/firebaseConflict.ts`。

@@ -12,10 +12,19 @@ Options:
   -i, --interactive   Region selection (drag to select area)
   -w, --window        Window selection (click a window to capture)
   -p, --path <file>   Use existing image file instead of screenshot
-  --no-sync           Skip Firebase sync (OCR only, print tasks locally)
+  --no-sync           Dry-run: OCR only, print tasks locally (no Firebase)
   -h, --help          Show this help
 
 Default: full-screen capture if no flags provided.
+
+Exit codes:
+  0 — Success (tasks extracted, synced or printed)
+  1 — Error (missing env vars, backend down, auth failed, etc.)
+
+Environment (set in project root .env):
+  TODO_PRO_EMAIL          Firebase auth email (required for sync)
+  TODO_PRO_PASSWORD       Firebase auth password (required for sync)
+  TODO_PRO_BACKEND_URL    Backend URL (default: http://localhost:8787)
 `.trim();
 
 const firebaseConfig = {
@@ -235,6 +244,7 @@ async function main() {
   }
 
   if (noSync) {
+    console.log('🔍 Dry-run 模式：仅本地识别，不同步到 Firebase');
     printTasksLocally(tasks, ocrText);
     process.exit(0);
   }

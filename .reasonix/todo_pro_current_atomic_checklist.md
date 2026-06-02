@@ -95,17 +95,17 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 
 原子任务：
 
-- [ ] 为拆解结果编辑输入增加明确保存/取消视觉状态
-- [ ] 接受全部后也显示“已保存到子任务”的反馈
-- [ ] 拆解结果为空时显示友好空状态
-- [ ] 拆解失败时提供重试按钮
+- [x] 为拆解结果编辑输入增加明确保存/取消视觉状态
+- [x] 接受全部后也显示“已保存到子任务”的反馈
+- [x] 拆解结果为空时显示友好空状态
+- [x] 拆解失败时提供重试按钮
 
 验收标准：
 
-- [ ] 用户可以编辑拆解项标题和预计分钟后接受
-- [ ] 接受单条和全部接受都会持久化到 `task.subtasks`
-- [ ] 关闭再打开任务详情，子任务仍存在
-- [ ] `npm run test:ui` 包含至少 1 个 AI 拆解交互测试
+- [x] 用户可以编辑拆解项标题和预计分钟后接受
+- [x] 接受单条和全部接受都会持久化到 `task.subtasks`
+- [x] 关闭再打开任务详情，子任务仍存在
+- [x] `npm run test:ui` 包含至少 1 个 AI 拆解交互测试
 
 ### P1-2. 实际耗时记录流程完善
 
@@ -113,17 +113,17 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 
 原子任务：
 
-- [ ] 完成任务后给出明显的“记录实际耗时”提示入口
-- [ ] 实际耗时输入校验：仅允许正整数，最大值合理限制（如 1440 分钟）
-- [ ] 保存成功后显示反馈，并刷新详情展示
-- [ ] 支持修改已记录实际耗时
+- [x] 完成任务后给出明显的“记录实际耗时”提示入口
+- [x] 实际耗时输入校验：仅允许正整数，最大值合理限制（如 1440 分钟）
+- [x] 保存成功后显示反馈，并刷新详情展示
+- [x] 支持修改已记录实际耗时
 
 验收标准：
 
-- [ ] 已完成任务可记录、修改实际耗时
-- [ ] 非法输入不会写入任务
-- [ ] `StatsPanel` 显示预估、实际、偏差
-- [ ] `TaskItem` 或 `TaskDetailModal` 有对应 UI 测试
+- [x] 已完成任务可记录、修改实际耗时
+- [x] 非法输入不会写入任务
+- [x] `StatsPanel` 显示预估、实际、偏差
+- [x] `TaskItem` 或 `TaskDetailModal` 有对应 UI 测试
 
 ### P1-3. 专注模式前台体验完善
 
@@ -131,17 +131,17 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 
 原子任务：
 
-- [ ] 支持暂停/继续番茄钟
-- [ ] 支持提前完成并记录实际专注分钟
-- [ ] 支持跳过休息但不丢失已完成 session
-- [ ] 详情页展示该任务的专注 session 历史
+- [x] 支持暂停/继续番茄钟
+- [x] 支持提前完成并记录实际专注分钟
+- [x] 支持跳过休息但不丢失已完成 session
+- [x] 详情页展示该任务的专注 session 历史
 
 验收标准：
 
-- [ ] 完成一轮专注后追加写入 `task.focusSessions`
-- [ ] 多次专注不会覆盖历史 session
-- [ ] 统计面板展示专注次数和总分钟数
-- [ ] README 明确后台/锁屏通知仍为 planned
+- [x] 完成一轮专注后追加写入 `task.focusSessions`
+- [x] 多次专注不会覆盖历史 session
+- [x] 统计面板展示专注次数和总分钟数
+- [x] README 明确后台/锁屏通知仍为 planned
 
 ### P1-4. 通知系统用户反馈
 
@@ -246,16 +246,16 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 
 原子任务：
 
-- [ ] 增加 TaskDetailModal 测试
-- [ ] 增加 FocusTimerModal 测试
-- [ ] 增加 StatsPanel 渲染测试
-- [ ] 增加 SyncTargetRow token 输入测试
+- [x] 增加 TaskDetailModal 测试
+- [x] 增加 FocusTimerModal 测试
+- [x] 增加 StatsPanel 渲染测试
+- [x] 增加 SyncTargetRow token 输入测试
 
 验收标准：
 
-- [ ] `npm run test:ui` 至少覆盖 6 个组件
-- [ ] AI 拆解、实际耗时、专注记录都有交互测试
-- [ ] Jest 不扫描 backend/dist 或 domain/lib 脚本测试
+- [x] `npm run test:ui` 至少覆盖 6 个组件
+- [x] AI 拆解、实际耗时、专注记录都有交互测试
+- [x] Jest 不扫描 backend/dist 或 domain/lib 脚本测试
 
 ### P3-2. 无障碍回归
 

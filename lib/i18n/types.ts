@@ -46,6 +46,31 @@ export interface Translations {
     ai_decompose: string;
     start_focus: string;
     created: string;
+    status_done: string;
+    status_todo: string;
+    priority_high: string;
+    priority_medium: string;
+    priority_low: string;
+    due_placeholder: string;
+    add_subtask: string;
+    remove_subtask: string;
+    all_subtasks_done: string;
+    ai_result: string;
+    accept_all: string;
+    accept: string;
+    reject: string;
+    saved_subtasks: string;
+    decompose_failed: string;
+    decompose_retry: string;
+    empty_decompose: string;
+    actual_prompt: string;
+    actual_placeholder: string;
+    invalid_input: string;
+    invalid_est: string;
+    invalid_actual: string;
+    focus_history: string;
+    focus_session: string;
+    source: string;
   };
 
   // 审核卡片
@@ -82,6 +107,15 @@ export interface Translations {
     todoist_token_placeholder: string;
     todoist_token_label: string;
     oauth_planned: string;
+    local_data: string;
+    inline_stats: string;
+    clear_data: string;
+    clear_confirm: string;
+    export_json: string;
+    export_snapshot: string;
+    source_library: string;
+    performance_warning: string;
+    not_connected: string;
   };
 
   // 同步
@@ -97,5 +131,12 @@ export interface Translations {
     completed_tasks: string;
     focus_count: string;
     total_focus_minutes: string;
+    completion_rate: string;
+    streak_days: string;
+    avg_time: string;
+    best_day: string;
+    trend: string;
+    source_distribution: string;
+    minutes: string;
   };
 }

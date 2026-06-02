@@ -182,6 +182,28 @@ export function useFirebaseTasks() {
       if (duplicateGroups.length === 0) return { archived: 0, groups: 0 };
 
       const now = getCurrentIsoString();
+
+      // Pre-batch conflict check: verify no remote changes since last local read
+      const affectedIds = new Set<string>();
+      for (const group of duplicateGroups) {
+        affectedIds.add(group.primaryId);
+        for (const dupId of group.duplicateIds) affectedIds.add(dupId);
+      }
+      const localMap = new Map(tasks.map((t) => [t.id, t]));
+      const docRefs = Array.from(affectedIds).map((id) => doc(db, "users", user.uid, "tasks", id));
+      const snapshots = await Promise.all(docRefs.map((ref) => getDoc(ref)));
+      for (const snap of snapshots) {
+        if (!snap.exists()) continue;
+        const remote = snap.data() as NormalizedTask;
+        const local = localMap.get(snap.id);
+        if (local) {
+          const conflict = detectFirebaseConflict(local.updatedAt, remote.updatedAt);
+          if (conflict.hasConflict && conflict.remoteUpdatedAt) {
+            throw new FirebaseConflictError(snap.id, local.updatedAt, conflict.remoteUpdatedAt);
+          }
+        }
+      }
+
       const batch = writeBatch(db);
       const archivedIds = new Set<string>();
 
@@ -233,26 +255,36 @@ export function useFirebaseTasks() {
     if (!user) return undefined;
     try {
       const now = getCurrentIsoString();
-      const batch = writeBatch(db);
-      let updatedCount = 0;
+      const reviewTasks = tasks.filter((t) => t.status === "todo" && needsTimeReview(t));
+      if (reviewTasks.length === 0) return 0;
 
-      tasks.forEach((task) => {
-        if (task.status === "todo" && needsTimeReview(task)) {
-          updatedCount++;
-          const taskRef = doc(db, "users", user.uid, "tasks", task.id);
-          batch.update(taskRef, {
-            needsConfirmation: false,
-            timeStatus: task.dueText ? "confirmed" : "none",
-            updatedAt: now,
-          });
+      // Pre-batch conflict check: verify no remote changes since last local read
+      const docRefs = reviewTasks.map((t) => doc(db, "users", user.uid, "tasks", t.id));
+      const snapshots = await Promise.all(docRefs.map((ref) => getDoc(ref)));
+      for (const snap of snapshots) {
+        if (!snap.exists()) continue;
+        const remote = snap.data() as NormalizedTask;
+        const local = reviewTasks.find((t) => t.id === snap.id);
+        if (local) {
+          const conflict = detectFirebaseConflict(local.updatedAt, remote.updatedAt);
+          if (conflict.hasConflict && conflict.remoteUpdatedAt) {
+            throw new FirebaseConflictError(snap.id, local.updatedAt, conflict.remoteUpdatedAt);
+          }
         }
-      });
-
-      if (updatedCount > 0) {
-        await batch.commit();
       }
 
-      return updatedCount;
+      const batch = writeBatch(db);
+      reviewTasks.forEach((task) => {
+        const taskRef = doc(db, "users", user.uid, "tasks", task.id);
+        batch.update(taskRef, {
+          needsConfirmation: false,
+          timeStatus: task.dueText ? "confirmed" : "none",
+          updatedAt: now,
+        });
+      });
+
+      await batch.commit();
+      return reviewTasks.length;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to confirm time reviews");
       return undefined;

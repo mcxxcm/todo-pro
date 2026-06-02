@@ -63,12 +63,12 @@ lib/i18n/
 
 ## 迁移策略
 
-### Phase 4a: 基础设施（当前）
-1. 创建 `lib/i18n/` 目录结构
-2. 定义 `TranslationKeys` 类型
-3. 创建 `zh.ts`（从当前硬编码字符串收集）和 `en.ts`（英文翻译）
-4. 创建 `I18nContext` + `useI18n` hook，默认中文
-5. 先迁移一个页面验证（建议 `explore.tsx` 设置页）
+### Phase 4a: 基础设施 ✅ 已完成
+1. ✅ `lib/i18n/` 目录结构已创建
+2. ✅ `TranslationKeys` 类型已定义（8 个 section，90+ 键）
+3. ✅ `zh.ts` 和 `en.ts` 已完成翻译
+4. ✅ `I18nContext` + `useI18n` hook 已创建，默认中文
+5. ⬜ 组件接入 — 已补齐 taskDetail/settings/stats 缺失键，TaskDetailModal 可作为首个迁移目标
 
 ### Phase 4b: 逐步迁移
 - 按优先级表逐组件替换硬编码字符串

@@ -94,7 +94,6 @@ assert.deepEqual(
 
 // Inbox section: priority-first, then newest-first by createdAt
 {
-  const now = "2026-05-28T10:00:00.000Z";
   const inboxTasks: NormalizedTask[] = [
     { ...baseTask, id: "i-none-new", title: "none new", createdAt: "2026-05-28T10:00:00.000Z", priority: "none" },
     { ...baseTask, id: "i-high-old", title: "high old", createdAt: "2026-05-27T00:00:00.000Z", priority: "high" },

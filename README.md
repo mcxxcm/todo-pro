@@ -176,6 +176,8 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 - Storage engine: currently AsyncStorage (key-value). SQLite migration is recommended when task count exceeds 500; AsyncStorage loads all tasks into memory on each read, while SQLite supports indexed queries and pagination for better performance at scale.
 - Calendar/Reminders/Todoist: payload/format layers are tested, but real external writes are intentionally skipped until user authorization and conflict handling are implemented. Todoist 当前使用 Personal API Token（设置 > 集成 > Developer）；OAuth 2.0 授权集成计划在 Phase 3。
 - Privacy controls: active. Settings can count, clear, and create an export snapshot for local data.
+- Focus Mode / Pomodoro: active with local focus sessions, total statistics. Background and lock screen notifications are planned for Phase 3.
+
 
 ## Firebase Sync (Last-Write-Wins)
 

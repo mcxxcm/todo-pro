@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { parseClientDateInfo } from "../lib/clientTimeParser";
 import {
   parseChineseDateInfo,
-  type ParsedChineseDateInfo,
 } from "../backend/src/time/parseChineseTime";
 
 /**
@@ -18,6 +17,8 @@ import {
  *   b) The date granularity is compatible (same day, same month pattern)
  */
 
+const refDate = new Date("2026-06-02T12:00:00.000Z");
+
 const TEST_CASES: { text: string; expectParse: boolean }[] = [
   { text: "明天下午3点", expectParse: true },
   { text: "今晚八点前", expectParse: true },
@@ -30,8 +31,8 @@ const TEST_CASES: { text: string; expectParse: boolean }[] = [
 ];
 
 for (const { text, expectParse } of TEST_CASES) {
-  const clientResult = parseClientDateInfo(text);
-  const backendResult = parseChineseDateInfo(text);
+  const clientResult = parseClientDateInfo(text, refDate);
+  const backendResult = parseChineseDateInfo(text, refDate);
 
   if (expectParse) {
     assert.ok(clientResult, `Client parser should parse: "${text}"`);
@@ -41,20 +42,13 @@ for (const { text, expectParse } of TEST_CASES) {
     assert.equal(backendResult, null, `Backend parser should return null for: "${text}"`);
   }
 
-  // If both parsed, compare date granularity
+  // If both parsed, compare exact date and time output
   if (clientResult && backendResult) {
-    const cDate = new Date(clientResult.dueAt);
-    const bDate = new Date(backendResult.dueAt);
-
-    // Same day of month (±1 for timezone/timing edge cases)
-    const dayDiff = Math.abs(cDate.getDate() - bDate.getDate());
-    assert.ok(dayDiff <= 1,
-      `Date day mismatch for "${text}": client=${cDate.toISOString()}, backend=${bDate.toISOString()}`);
-
-    // Same month (±1 for month boundary edge cases)
-    const monthDiff = Math.abs(cDate.getMonth() - bDate.getMonth());
-    assert.ok(monthDiff <= 1,
-      `Date month mismatch for "${text}": client=${cDate.toISOString()}, backend=${bDate.toISOString()}`);
+    assert.equal(
+      clientResult.dueAt,
+      backendResult.dueAt,
+      `dueAt mismatch for "${text}": client=${clientResult.dueAt}, backend=${backendResult.dueAt}`
+    );
 
     // Both should produce non-empty dueText or dueAt
     assert.ok(clientResult.dueAt || clientResult.dueText,
@@ -68,7 +62,7 @@ for (const { text, expectParse } of TEST_CASES) {
 
 // "明天下午3点" → should produce afternoon time
 {
-  const r = parseClientDateInfo("明天下午3点");
+  const r = parseClientDateInfo("明天下午3点", refDate);
   if (r) {
     const h = new Date(r.dueAt).getHours();
     assert.ok(h >= 12 && h <= 17, `Expected afternoon hours, got ${h}: ${r.dueAt}`);
@@ -77,10 +71,11 @@ for (const { text, expectParse } of TEST_CASES) {
 
 // "下周五" → should be a Friday
 {
-  const r1 = parseClientDateInfo("下周五");
-  const r2 = parseChineseDateInfo("下周五");
+  const r1 = parseClientDateInfo("下周五", refDate);
+  const r2 = parseChineseDateInfo("下周五", refDate);
   if (r1) assert.equal(new Date(r1.dueAt).getDay(), 5, "Client: should be Friday");
   if (r2) assert.equal(new Date(r2.dueAt).getDay(), 5, "Backend: should be Friday");
 }
 
 console.log("Time consistency checks passed: 10");
+

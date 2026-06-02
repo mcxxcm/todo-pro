@@ -1,5 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
 
 import { Colors } from "@/constants/theme";
 import { Glass, Radius, Spacing } from "@/constants/tokens";

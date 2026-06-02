@@ -1,8 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth, initializeAuth, Auth } from 'firebase/auth';
 // @ts-ignore
-import { getReactNativePersistence } from 'firebase/auth';
+import { getAuth, initializeAuth, Auth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -28,7 +27,7 @@ if (Platform.OS === 'web') {
     auth = initializeAuth(app, {
       persistence: getReactNativePersistence(AsyncStorage),
     });
-  } catch (e) {
+  } catch {
     // Fallback if already initialized
     auth = getAuth(app);
   }

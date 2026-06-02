@@ -1,6 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import {
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,

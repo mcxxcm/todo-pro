@@ -1,4 +1,4 @@
-import { PropsWithChildren, useEffect, useState } from "react";
+import { PropsWithChildren, useEffect } from "react";
 import {
   AccessibilityInfo,
   StyleProp,
@@ -26,14 +26,12 @@ export function MotionListItem({
 }: MotionListItemProps) {
   const opacity = useSharedValue(0);
   const translateY = useSharedValue<number>(Motion.translate.listEnterY);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
       if (reduceMotion) {
         opacity.value = 1;
         translateY.value = 0 as number;
-        setReady(true);
         return;
       }
 
@@ -56,7 +54,6 @@ export function MotionListItem({
           easing: Easing.out(Easing.cubic),
         }),
       );
-      setReady(true);
     });
   }, [index, opacity, translateY]);
 

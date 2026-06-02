@@ -2,9 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { GlassCard } from "@/components/ui/GlassCard";
 import { DataCell } from "@/components/settings/MetricCell";
-import { Colors } from "@/constants/theme";
 import { Radius, Spacing, StatusColors } from "@/constants/tokens";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 
 interface SourceSummaryProps {
   totalCount: number;
@@ -20,9 +18,6 @@ export function SourceSummary({
   backedCount,
   orphanCount,
 }: SourceSummaryProps) {
-  const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
-  const colors = Colors[colorScheme];
-
   return (
     <GlassCard style={styles.card}>
       <View style={styles.grid}>

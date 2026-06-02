@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import Animated, {
   useSharedValue,
@@ -31,11 +31,8 @@ export function EmptyTaskState({
 
   const floatY = useSharedValue(0);
   const glowOpacity = useSharedValue(0.4);
-  const [reduceMotion, setReduceMotion] = useState(false);
-
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      setReduceMotion(enabled);
       if (enabled) return;
 
       floatY.value = withRepeat(

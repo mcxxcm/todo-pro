@@ -2,7 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { Colors } from "@/constants/theme";
-import { Glass, Opacity, Radius, Spacing, StatusColors } from "@/constants/tokens";
+import { Glass, Radius, Spacing, StatusColors } from "@/constants/tokens";
 import type { TaskGroupCounts, TaskGroupFilter } from "@/domain/taskGrouping";
 import { priorityColor } from "@/components/task/PriorityPicker";
 import { useColorScheme } from "@/hooks/use-color-scheme";

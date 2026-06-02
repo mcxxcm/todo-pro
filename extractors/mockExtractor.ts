@@ -3,10 +3,8 @@ import { ExtractedTask, ExtractionResult } from "@/types/extraction";
 import { TaskPriority } from "@/types/task";
 import {
   WEEKDAY_NAMES,
-  CN_DIGITS,
   CN_NUMBER_PATTERN,
   parseChineseNumber,
-  normalizeHour,
   parseTimeOfDay,
 } from "@/lib/clientTimeParser";
 

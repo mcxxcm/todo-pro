@@ -12,7 +12,6 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Colors } from "@/constants/theme";
 import { Glass, Radius, Spacing } from "@/constants/tokens";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { getCurrentIsoString } from "@/lib/time";
 
 const MONTHS = [
   "1月", "2月", "3月", "4月", "5月", "6月",
@@ -48,6 +47,7 @@ export function DatePickerModal({ visible, onClose, onSelect, initialDate }: Dat
       return isNaN(d.getTime()) ? new Date() : d;
     }
     return new Date();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDate, visible]);
 
   const [year, setYear] = useState(now.getFullYear());

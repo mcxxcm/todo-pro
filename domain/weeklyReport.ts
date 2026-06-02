@@ -17,10 +17,6 @@ export interface WeeklyReport {
   summary: string;
 }
 
-function toDateKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
 function getWeekStart(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
@@ -88,7 +84,6 @@ export function computeWeeklyReport(
   }).length;
 
   // Completion rate (tasks created or completed this week)
-  const totalClosed = weekTasks.filter((t) => t.status === "done" || t.status === "archived").length;
   const completionRate = weekTasks.length === 0 ? 0 : completedCount / weekTasks.length;
 
   const dayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];

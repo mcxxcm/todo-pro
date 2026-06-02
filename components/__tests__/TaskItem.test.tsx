@@ -12,25 +12,23 @@ jest.mock("@/components/ui/GlassCard", () => ({
   GlassCard: ({ children, ...props }: any) => children,
 }));
 jest.mock("@/components/task/TaskMetadata", () => {
-  const React = require("react");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const R = require("react");
   return {
     TaskMetadata: ({ task }: any) =>
-      React.createElement("React.Fragment", null,
-        task.priority !== "none" && React.createElement("Text", null, task.priority === "high" ? "高优先级" : task.priority),
-        task.subtasks && task.subtasks.length > 0 && React.createElement("Text", null, `${task.subtasks.filter((s: any) => s.status === "done").length}/${task.subtasks.length}`),
+      R.createElement("React.Fragment", null,
+        task.priority !== "none" && R.createElement("Text", null, task.priority === "high" ? "高优先级" : task.priority),
+        task.subtasks && task.subtasks.length > 0 && R.createElement("Text", null, `${task.subtasks.filter((s: any) => s.status === "done").length}/${task.subtasks.length}`),
       ),
   };
 });
 jest.mock("@/components/task/TaskDetailModal", () => ({
   TaskDetailModal: () => null,
 }));
-jest.mock("@/components/task/PriorityPicker", () => {
-  const React = require("react");
-  return {
-    priorityColor: () => "#FF3B30",
-    PriorityPicker: ({ value, onChange }: any) => null,
-  };
-});
+jest.mock("@/components/task/PriorityPicker", () => ({
+  priorityColor: () => "#FF3B30",
+  PriorityPicker: ({ value, onChange }: any) => null,
+}));
 jest.mock("@/domain/sourceTimeline", () => ({
   getSourceTypeLabel: () => "手动",
 }));

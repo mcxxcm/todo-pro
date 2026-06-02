@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -103,6 +104,19 @@ export function TaskDetailModal({
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
 
+    const est = estimatedMinutes ? parseInt(estimatedMinutes, 10) : undefined;
+    const act = actualMinutes ? parseInt(actualMinutes, 10) : undefined;
+
+    if (est !== undefined && (isNaN(est) || est <= 0 || est > 1440)) {
+      Alert.alert("输入无效", "预估时间必须在 1 至 1440 分钟（24小时）之间。");
+      return;
+    }
+
+    if (act !== undefined && (isNaN(act) || act <= 0 || act > 1440)) {
+      Alert.alert("输入无效", "实际用时必须在 1 至 1440 分钟（24小时）之间。");
+      return;
+    }
+
     const patch: TaskUpdateInput = {
       title: trimmedTitle,
       notes: notes.trim() || undefined,
@@ -111,8 +125,8 @@ export function TaskDetailModal({
       priority: priority !== "none" ? priority : undefined,
       tags: tags.length > 0 ? tags : undefined,
       subtasks: subtasks.length > 0 ? subtasks : undefined,
-      estimatedMinutes: estimatedMinutes ? parseInt(estimatedMinutes, 10) || undefined : undefined,
-      actualMinutes: actualMinutes ? parseInt(actualMinutes, 10) || undefined : undefined,
+      estimatedMinutes: est || undefined,
+      actualMinutes: act || undefined,
       recurrence,
     };
 
@@ -201,6 +215,8 @@ export function TaskDetailModal({
     const nextSubtasks = [...subtasks, ...newItems];
     setSubtasks(nextSubtasks);
     setDecompositionResult(null);
+    setDecomposeAccepted(true);
+    setTimeout(() => setDecomposeAccepted(false), 2000);
     void onUpdate(task.id, { subtasks: nextSubtasks });
   };
 
@@ -538,14 +554,34 @@ export function TaskDetailModal({
                           >
                             <MaterialIcons name="check" size={14} color={StatusColors.success} />
                           </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => setEditDecomposeIndex(null)}
+                            style={styles.decomposeAction}
+                            accessibilityLabel="取消编辑"
+                          >
+                            <MaterialIcons name="close" size={14} color={colors.icon} />
+                          </TouchableOpacity>
                         </View>
                       ) : (
                         <>
-                          <TouchableOpacity onPress={() => { setEditDecomposeIndex(i); setEditDecomposeTitle(item.title); setEditDecomposeMins(String(item.estimatedMinutes)); }}>
-                            <Text style={[styles.decomposeItemTitle, { color: colors.text }]}>{item.title}</Text>
-                            <Text style={[styles.decomposeItemTime, { color: colors.icon }]}>
-                              ~{item.estimatedMinutes}分钟
+                          <TouchableOpacity
+                            onPress={() => {
+                              setEditDecomposeIndex(i);
+                              setEditDecomposeTitle(item.title);
+                              setEditDecomposeMins(String(item.estimatedMinutes));
+                            }}
+                            style={styles.decomposeItemTouch}
+                            accessibilityLabel={`编辑子任务拆解: ${item.title}`}
+                          >
+                            <Text style={[styles.decomposeItemTitle, { color: colors.text }]} numberOfLines={1}>
+                              {item.title}
                             </Text>
+                            <View style={styles.decomposeTimeWithEdit}>
+                              <Text style={[styles.decomposeItemTime, { color: colors.icon }]}>
+                                ~{item.estimatedMinutes}分钟
+                              </Text>
+                              <MaterialIcons name="edit" size={12} color={colors.tint} style={styles.editIconHint} />
+                            </View>
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => handleAcceptDecomposition(i)}
@@ -590,8 +626,24 @@ export function TaskDetailModal({
             </View>
 
             {/* Actual time */}
-            <View style={styles.section}>
+            <View style={[
+              styles.section,
+              !editing && task.status === "done" && !task.actualMinutes && {
+                padding: Spacing.sm,
+                borderRadius: Radius.md,
+                borderStyle: "dashed",
+                borderWidth: 1.5,
+                borderColor: colors.tint + "80",
+                backgroundColor: colors.tint + "0A",
+                marginTop: 4,
+              }
+            ]}>
               <Text style={[styles.sectionLabel, { color: colors.tint }]}>实际耗时（分钟）</Text>
+              {!editing && task.status === "done" && !task.actualMinutes && (
+                <Text style={{ fontSize: 11, fontWeight: "600", color: colors.tint, marginBottom: 4 }}>
+                  ✨ 恭喜完成任务！建议记录实际耗时以丰富生产力统计：
+                </Text>
+              )}
               {editing ? (
                 <TextInput
                   value={actualMinutes}
@@ -994,6 +1046,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: Radius.md,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  decomposeItemTouch: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginRight: 6,
+    gap: 4,
+  },
+  decomposeTimeWithEdit: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  editIconHint: {
+    opacity: 0.7,
   },
   decomposeItemTitle: {
     flex: 1,

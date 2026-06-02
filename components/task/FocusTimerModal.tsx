@@ -39,6 +39,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
   const [phase, setPhase] = useState<Phase>("idle");
   const [secondsLeft, setSecondsLeft] = useState(WORK_MINUTES * 60);
   const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionStartRef = useRef<string>("");
 
@@ -59,6 +60,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
     setPhase("work");
     setSecondsLeft(WORK_MINUTES * 60);
     setRunning(true);
+    setPaused(false);
     sessionStartRef.current = getCurrentIsoString();
     clearTimer();
     intervalRef.current = setInterval(() => {
@@ -71,6 +73,45 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
         return prev - 1;
       });
     }, 1000);
+  };
+
+  const togglePause = () => {
+    if (paused) {
+      setPaused(false);
+      clearTimer();
+      intervalRef.current = setInterval(() => {
+        setSecondsLeft((prev) => {
+          if (prev <= 1) {
+            clearTimer();
+            setRunning(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setPaused(true);
+      clearTimer();
+    }
+  };
+
+  const finishEarly = () => {
+    clearTimer();
+    const elapsedSeconds = totalSeconds - secondsLeft;
+    const duration = Math.max(1, Math.round(elapsedSeconds / 60));
+    
+    const session: FocusSession = {
+      startedAt: sessionStartRef.current,
+      endedAt: getCurrentIsoString(),
+      durationMinutes: duration,
+    };
+    onComplete(session);
+
+    // Reset timer
+    setPhase("idle");
+    setRunning(false);
+    setPaused(false);
+    setSecondsLeft(WORK_MINUTES * 60);
   };
 
   useEffect(() => {
@@ -86,6 +127,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
       setPhase("break");
       setSecondsLeft(BREAK_MINUTES * 60);
       setRunning(true);
+      setPaused(false);
       clearTimer();
       intervalRef.current = setInterval(() => {
         setSecondsLeft((prev) => {
@@ -99,6 +141,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
       }, 1000);
     } else if (!running && secondsLeft === 0 && phase === "break") {
       setPhase("idle");
+      setPaused(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, secondsLeft, phase]);
@@ -107,6 +150,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
     clearTimer();
     setPhase("idle");
     setRunning(false);
+    setPaused(false);
     setSecondsLeft(WORK_MINUTES * 60);
     onClose();
   };
@@ -121,7 +165,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
         <GlassCard style={styles.card}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>
-              {phase === "work" ? "专注中" : phase === "break" ? "休息一下" : "番茄钟"}
+              {phase === "work" ? (paused ? "已暂停" : "专注中") : phase === "break" ? "休息一下" : "番茄钟"}
             </Text>
             <TouchableOpacity onPress={handleClose} accessibilityLabel="关闭番茄钟">
               <MaterialIcons name="close" size={20} color={colors.icon} />
@@ -164,15 +208,56 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
             </TouchableOpacity>
           )}
 
-          {running && (
+          {phase === "work" && (
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                onPress={togglePause}
+                style={[styles.controlBtn, { borderColor: colors.tint }]}
+                accessibilityLabel={paused ? "继续" : "暂停"}
+              >
+                <MaterialIcons name={paused ? "play-arrow" : "pause"} size={16} color={colors.tint} />
+                <Text style={[styles.controlBtnText, { color: colors.tint }]}>
+                  {paused ? "继续" : "暂停"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={finishEarly}
+                style={[styles.controlBtn, { borderColor: StatusColors.success }]}
+                accessibilityLabel="提前结束并记录"
+              >
+                <MaterialIcons name="done" size={16} color={StatusColors.success} />
+                <Text style={[styles.controlBtnText, { color: StatusColors.success }]}>
+                  完成
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleClose}
+                style={[styles.controlBtn, { borderColor: colors.icon }]}
+                accessibilityLabel="跳过并放弃"
+              >
+                <MaterialIcons name="close" size={16} color={colors.icon} />
+                <Text style={[styles.controlBtnText, { color: colors.icon }]}>
+                  放弃
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {phase === "break" && (
             <TouchableOpacity
               onPress={handleClose}
               style={[styles.skipBtn, { borderColor: Glass.border[colorScheme] }]}
-              accessibilityLabel="跳过番茄钟"
+              accessibilityLabel="跳过休息"
             >
-              <Text style={[styles.skipBtnText, { color: colors.icon }]}>跳过</Text>
+              <Text style={[styles.skipBtnText, { color: colors.icon }]}>跳过休息</Text>
             </TouchableOpacity>
           )}
+
+          <Text style={[styles.disclaimerText, { color: colors.icon }]}>
+            * 提示：当前暂不支持后台/锁屏通知，请保持前台运行。
+          </Text>
         </GlassCard>
       </View>
     </Modal>
@@ -253,5 +338,32 @@ const styles = StyleSheet.create({
   skipBtnText: {
     fontSize: 13,
     fontWeight: "700",
+  },
+  disclaimerText: {
+    fontSize: 10,
+    fontWeight: "600",
+    opacity: 0.6,
+    textAlign: "center",
+    marginTop: 4,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: Spacing.xs,
+    width: "100%",
+    justifyContent: "center",
+  },
+  controlBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    minHeight: 36,
+  },
+  controlBtnText: {
+    fontSize: 12,
+    fontWeight: "800",
   },
 });

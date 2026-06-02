@@ -47,7 +47,6 @@ import { CURRENT_SCHEMA_VERSION } from "./migration";
   ];
 
   for (const data of corruptedCases) {
-    const isArray = Array.isArray(data);
     // The migration code checks `if (!Array.isArray(tasks)) return;`
     // This should not throw.
     assert.doesNotThrow(() => {
@@ -56,7 +55,7 @@ import { CURRENT_SCHEMA_VERSION } from "./migration";
       for (const item of data as any[]) {
         if (typeof item !== "object" || item === null) continue;
         // Accessing unknown fields should be safe
-        const _ = item.subtasks;
+        void item.subtasks;
       }
     }, `Corrupted data case should not throw: ${JSON.stringify(data)}`);
   }

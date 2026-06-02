@@ -1,4 +1,4 @@
-import type { NormalizedTask, TaskStatus } from "@/types/task";
+import type { NormalizedTask } from "@/types/task";
 import type { SourceItemType } from "@/types/source";
 
 export interface ProductivityStats {

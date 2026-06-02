@@ -19,7 +19,8 @@ Default: full-screen capture if no flags provided.
 
 Exit codes:
   0 — Success (tasks extracted, synced or printed)
-  1 — Error (missing env vars, backend down, auth failed, etc.)
+  1 — Error (missing env vars, backend unreachable, auth failed, empty image, etc.)
+  2 — OCR returned no tasks (image may have no recognizable text)
 
 Environment (set in project root .env):
   TODO_PRO_EMAIL          Firebase auth email (required for sync)
@@ -212,7 +213,12 @@ async function main() {
       console.error(`❌ 文件不存在: ${screenshotPath}`);
       process.exit(1);
     }
-    console.log(`📂 使用已有图片: ${screenshotPath}`);
+    const fileSize = statSync(screenshotPath).size;
+    if (fileSize === 0) {
+      console.error(`❌ 图片文件为空 (0 字节): ${screenshotPath}`);
+      process.exit(1);
+    }
+    console.log(`📂 使用已有图片: ${screenshotPath} (${formatBytes(fileSize)})`);
   } else {
     screenshotPath = await captureScreenshot(mode);
     isTemp = true;
@@ -239,8 +245,13 @@ async function main() {
 
   if (!tasks || tasks.length === 0) {
     console.log('⚠️ 未能从截图中识别出任何任务。');
-    if (ocrText) console.log(`   识别到的文字: ${ocrText}`);
-    process.exit(0);
+    if (ocrText) {
+      console.log(`   OCR 识别到的文字: ${ocrText}`);
+      console.log('   提示：图片可能不含可解析的任务文本。');
+    } else {
+      console.log('   提示：OCR 未返回任何文字，请检查图片是否清晰可读。');
+    }
+    process.exit(2);
   }
 
   if (noSync) {

@@ -242,11 +242,13 @@ Firebase Firestore 实时同步采用 `updatedAt` 冲突检测策略：
 
 - 每个任务作为一个 Firestore document 存储在 `users/{uid}/tasks/{taskId}`。
 - 读操作通过 `onSnapshot` 实时监听变更，本地状态即时同步。
-- 写入操作（`updateDoc` / `setDoc`）前会通过 `getDoc` 读取服务端当前 `updatedAt`，与本地预期值比较。
+- 更新操作（`toggleDone`、`updateTask`）在 `updateDoc` 前通过 `getDoc` 读取服务端 `updatedAt`，与本地预期值比较。
+- 新建任务（`addTask`）使用 `setDoc`，不检查冲突（新文档无冲突可能）。
+- 批量操作（`mergeDuplicates`、`confirmAllTimeReviews`）使用 `writeBatch`，当前不做逐文档冲突检查。
 - 若服务端 `updatedAt` 严格晚于本地，抛出 `FirebaseConflictError`，阻止静默覆盖。
-- 无冲突时执行正常写入，覆盖对应 document。
 
 **使用建议：**
 - 冲突时重新加载任务数据后重试编辑。
+- 批量操作建议在网络稳定时执行，或后续升级为逐文档冲突检查。
 - 离线修改在网络恢复后自动同步到 Firestore，以设备最后写入时间为准。
 - 冲突检测记录可追踪，详见 `domain/firebaseConflict.ts`。

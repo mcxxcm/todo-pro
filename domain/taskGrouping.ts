@@ -139,13 +139,23 @@ export function needsTimeReview(task: NormalizedTask) {
   );
 }
 
+const PRIORITY_ORDER: Record<string, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+  none: 3,
+};
+
 function sortNewestFirst(a: NormalizedTask, b: NormalizedTask) {
+  const priDiff = (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
+  if (priDiff !== 0) return priDiff;
   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 }
 
 function sortDueFirst(a: NormalizedTask, b: NormalizedTask) {
-  return (
-    new Date(a.dueAt ?? a.createdAt).getTime() -
-    new Date(b.dueAt ?? b.createdAt).getTime()
-  );
+  const priDiff = (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
+  if (priDiff !== 0) return priDiff;
+  const aTime = new Date(a.dueAt ?? a.createdAt).getTime();
+  const bTime = new Date(b.dueAt ?? b.createdAt).getTime();
+  return aTime - bTime;
 }

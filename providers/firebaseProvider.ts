@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, query, writeBatch, getDocs, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, query, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/providers/AuthContext";
 import { createNormalizedTask, CreateTaskExtra } from "@/domain/tasks";
+import { computeNextOccurrence } from "@/domain/recurrence";
 import { NormalizedTask, TaskUpdateInput } from "@/types/task";
 import { generateId } from "@/lib/taskStorage";
 import { getCurrentIsoString } from "@/lib/time";
@@ -85,6 +86,27 @@ export function useFirebaseTasks() {
         
         const updatedTask = { ...task, status: newStatus as NormalizedTask["status"], updatedAt: getCurrentIsoString() };
         await syncTaskNotification(updatedTask);
+
+        if (task.recurrence && task.dueAt && task.status === "todo") {
+          const next = computeNextOccurrence(task.recurrence, task.dueAt);
+          if (next) {
+            const nextTask = createNormalizedTask(task.title, {
+              priority: task.priority,
+              tags: task.tags,
+              dueAt: next.dueAt,
+              dueText: next.dueText,
+              notes: task.notes,
+              recurrence: task.recurrence,
+              sourceId: task.sourceId,
+              sourceType: task.sourceType,
+              sourceText: task.sourceText,
+              estimatedMinutes: task.estimatedMinutes,
+            }, { id: generateId(), now: new Date() });
+            const nextRef = doc(db, "users", user.uid, "tasks", nextTask.id);
+            await setDoc(nextRef, nextTask);
+            await syncTaskNotification(nextTask);
+          }
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to toggle task");
       }

@@ -24,6 +24,10 @@ interface TaskListProps {
   activeFilter?: TaskGroupFilter;
   onFilterChange?: (filter: TaskGroupFilter) => void;
   header?: ReactElement | null;
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onLongPress?: (id: string) => void;
+  onToggleSelection?: (id: string) => void;
 }
 
 export function TaskList({
@@ -35,6 +39,10 @@ export function TaskList({
   activeFilter = "all",
   onFilterChange,
   header,
+  selectionMode,
+  selectedIds,
+  onLongPress,
+  onToggleSelection,
 }: TaskListProps) {
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = Colors[colorScheme];
@@ -65,6 +73,10 @@ export function TaskList({
             onToggle={onToggle}
             onUpdate={onUpdate}
             onDelete={onDelete}
+            selectionMode={selectionMode}
+            selected={selectedIds?.has(item.id)}
+            onLongPress={onLongPress}
+            onToggleSelection={onToggleSelection}
           />
         </MotionListItem>
       )}

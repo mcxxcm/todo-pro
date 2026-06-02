@@ -4,13 +4,26 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { Colors } from "@/constants/theme";
 import { Glass, Opacity, Radius, Spacing, StatusColors } from "@/constants/tokens";
 import type { TaskGroupCounts, TaskGroupFilter } from "@/domain/taskGrouping";
+import { priorityColor } from "@/components/task/PriorityPicker";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import type { TaskPriority } from "@/types/task";
 
 interface TaskFilterRailProps {
   activeFilter: TaskGroupFilter;
   counts: TaskGroupCounts;
   onFilterChange: (filter: TaskGroupFilter) => void;
+  availableTags?: string[];
+  activeTag?: string | null;
+  onTagChange?: (tag: string | null) => void;
+  priorityFilter?: TaskPriority | null;
+  onPriorityChange?: (priority: TaskPriority | null) => void;
 }
+
+const PRIORITY_FILTER_ITEMS: { priority: TaskPriority; icon: string; label: string }[] = [
+  { priority: "high", icon: "priority-high", label: "高" },
+  { priority: "medium", icon: "flag", label: "中" },
+  { priority: "low", icon: "low-priority", label: "低" },
+];
 
 const FILTER_ITEMS = [
   { filter: "all", icon: "dashboard", label: "全部" },
@@ -26,6 +39,11 @@ export function TaskFilterRail({
   activeFilter,
   counts,
   onFilterChange,
+  availableTags = [],
+  activeTag = null,
+  onTagChange,
+  priorityFilter = null,
+  onPriorityChange,
 }: TaskFilterRailProps) {
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = Colors[colorScheme];
@@ -46,6 +64,7 @@ export function TaskFilterRail({
               key={item.filter}
               activeOpacity={0.72}
               accessibilityLabel={`筛选${item.label}任务`}
+              accessibilityRole="button"
               accessibilityState={{ selected: active }}
               onPress={() => onFilterChange(item.filter)}
               style={[
@@ -83,6 +102,84 @@ export function TaskFilterRail({
             </TouchableOpacity>
           );
         })}
+        {onPriorityChange && (
+          <>
+            <View style={[styles.divider, { backgroundColor: Glass.border[colorScheme] }]} />
+            {PRIORITY_FILTER_ITEMS.map((item) => {
+              const active = priorityFilter === item.priority;
+              return (
+                <TouchableOpacity
+                  key={item.priority}
+                  activeOpacity={0.72}
+                  accessibilityLabel={`按${item.label}优先级筛选`}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => onPriorityChange(active ? null : item.priority)}
+                  style={[
+                    styles.item,
+                    {
+                      backgroundColor: active
+                        ? colors.tint
+                        : Glass.inputBackground[colorScheme],
+                      borderColor: active ? colors.tint : Glass.border[colorScheme],
+                    },
+                  ]}
+                >
+                  <MaterialIcons
+                    name={item.icon as any}
+                    size={12}
+                    color={active ? (colorScheme === "dark" ? "#11181C" : "#fff") : priorityColor(item.priority, colorScheme)}
+                  />
+                  <Text style={[
+                    styles.label,
+                    { color: active ? (colorScheme === "dark" ? "#11181C" : "#fff") : priorityColor(item.priority, colorScheme) },
+                    active && styles.labelActive,
+                  ]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        )}
+        {availableTags.length > 0 && onTagChange && (
+          <>
+            <View style={[styles.divider, { backgroundColor: Glass.border[colorScheme] }]} />
+            {availableTags.map((tag) => {
+              const active = activeTag === tag;
+              return (
+                <TouchableOpacity
+                  key={tag}
+                  activeOpacity={0.72}
+                  accessibilityLabel={`按标签${tag}筛选`}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => onTagChange(active ? null : tag)}
+                  style={[
+                    styles.item,
+                    {
+                      backgroundColor: active
+                        ? colors.tint
+                        : Glass.inputBackground[colorScheme],
+                      borderColor: active ? colors.tint : Glass.border[colorScheme],
+                    },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="local-offer"
+                    size={12}
+                    color={active ? (colorScheme === "dark" ? "#11181C" : "#fff") : colors.icon}
+                  />
+                  <Text style={[
+                    styles.label,
+                    { color: active ? (colorScheme === "dark" ? "#11181C" : "#fff") : colors.icon },
+                    active && styles.labelActive,
+                  ]}>
+                    {tag}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -119,5 +216,12 @@ const styles = StyleSheet.create({
   },
   countOverdue: {
     fontWeight: "900",
+  },
+  divider: {
+    width: 1,
+    height: 18,
+    borderRadius: 1,
+    alignSelf: "center",
+    marginHorizontal: 2,
   },
 });

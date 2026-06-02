@@ -116,13 +116,13 @@ export default function ThemeEditorScreen() {
       </Animated.View>
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.iconButton} accessibilityLabel="关闭主题编辑器" accessibilityRole="button">
           <MaterialIcons name="close" size={24} color={activeColors.base === '#0c0d10' ? '#fff' : '#000'} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: activeColors.base === '#0c0d10' ? '#fff' : '#000' }]}>
           主题编辑器
         </Text>
-        <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
+        <TouchableOpacity onPress={handleSave} style={styles.saveButton} accessibilityLabel="保存并应用主题" accessibilityRole="button">
           <Text style={styles.saveButtonText}>保存使用</Text>
         </TouchableOpacity>
       </View>

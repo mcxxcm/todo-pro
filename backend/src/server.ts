@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { createTaskExtractionProvider } from "./providers";
+import { decomposeWithDeepSeek, type DecomposeInput } from "./providers/deepseekProvider";
 import { createOcrProvider } from "./providers/ocrProvider";
 import {
   MAX_IMAGE_BASE64_LENGTH,
@@ -106,6 +107,29 @@ app.post(
       res.json(result);
     } catch (err) {
       console.error("[extract-tasks] error:", err instanceof Error ? err.message : err);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
+
+app.post(
+  "/api/v1/decompose-task",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { title, notes, dueAt } = req.body ?? {};
+      if (!title || typeof title !== "string" || !title.trim()) {
+        res.status(400).json({ error: "Bad Request", message: "title is required" });
+        return;
+      }
+
+      const input: DecomposeInput = { title: title.trim() };
+      if (typeof notes === "string" && notes.trim()) input.notes = notes.trim();
+      if (typeof dueAt === "string" && dueAt.trim()) input.dueAt = dueAt.trim();
+
+      const result = await decomposeWithDeepSeek(input);
+      res.json(result);
+    } catch (err) {
+      console.error("[decompose-task] error:", err instanceof Error ? err.message : err);
       res.status(500).json({ error: "Internal Server Error" });
     }
   },

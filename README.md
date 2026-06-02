@@ -122,6 +122,26 @@ The backend exposes:
 
 The current app keeps external sync in a safe planned state: local storage is active, while Apple Reminders, Calendar, and Todoist are shown as future authorization-backed targets. No external service is written to without a later explicit integration.
 
+## Internationalization
+
+当前仅支持中文（zh-CN）。UI 文本、日期格式和错误消息均为中文。多语言支持（i18n）计划在 Phase 4 实现。
+
+## Time Parser Architecture
+
+中文时间解析采用前后端双解析器架构：
+
+| 解析器 | 位置 | 用途 |
+|--------|------|------|
+| `parseClientDateInfo` | `lib/clientTimeParser.ts` | 手动任务输入时在客户端解析 |
+| `parseChineseDateInfo` | `backend/src/time/parseChineseTime.ts` | AI 提取结果在后端解析 |
+
+**设计原则：**
+- 两套解析器覆盖相同的常见中文时间表达（相对日期、周几、月日、月份边界、相对时长）。
+- 客户端解析器侧重交互即时性，后端解析器侧重正则覆盖广度。
+- 新增时间表达式时，必须在两套解析器中同时更新，并通过 `test:time-consistency` 验证不出现分叉。
+
+**常见测试样例：** 明天下午3点、今晚八点前、下周五、下个月3号、月底前、半小时后。
+
 ## Verification
 
 Run these checks before handing off changes:
@@ -153,5 +173,20 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 - Share URL route: active for `text`, `title`, and `url` params.
 - Mock extraction hygiene: active. Source headers, standalone URLs, and non-actionable titles are filtered from task candidates.
 - Sync audit layer: active. Local provider writes records; repeated sync is skipped instead of duplicated.
-- Calendar/Reminders/Todoist: payload/format layers are tested, but real external writes are intentionally skipped until user authorization and conflict handling are implemented.
+- Storage engine: currently AsyncStorage (key-value). SQLite migration is recommended when task count exceeds 500; AsyncStorage loads all tasks into memory on each read, while SQLite supports indexed queries and pagination for better performance at scale.
+- Calendar/Reminders/Todoist: payload/format layers are tested, but real external writes are intentionally skipped until user authorization and conflict handling are implemented. Todoist 当前使用 Personal API Token（设置 > 集成 > Developer）；OAuth 2.0 授权集成计划在 Phase 3。
 - Privacy controls: active. Settings can count, clear, and create an export snapshot for local data.
+
+## Firebase Sync (Last-Write-Wins)
+
+Firebase Firestore 实时同步采用 **last-write-wins** 冲突策略：
+
+- 每个任务作为一个 Firestore document 存储在 `users/{uid}/tasks/{taskId}`。
+- 写入操作（`setDoc` / `updateDoc`）直接覆盖对应 document，不进行字段级合并。
+- 读操作通过 `onSnapshot` 实时监听变更，本地状态即时同步。
+- 多设备同时修改同一任务时，最后到达服务端的写入为最终状态，先前的写入会被覆盖。
+
+**使用建议：**
+- 避免多设备短时间内同时编辑同一任务。
+- 离线修改在网络恢复后自动同步到 Firestore，以设备最后写入时间为准。
+- 如需更细粒度的冲突检测（如字段级合并或 CRDT），请在 Phase 2 评估。

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -12,47 +12,37 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  Text,
   Platform,
 } from "react-native";
 import { NormalizedTask, TaskUpdateInput } from "@/types/task";
 import { ThemedText } from "@/components/themed-text";
-import { TaskDetails } from "@/components/task/TaskDetails";
-import { TaskEditForm } from "@/components/task/TaskEditForm";
+import { priorityColor } from "@/components/task/PriorityPicker";
+import { TaskDetailModal } from "@/components/task/TaskDetailModal";
 import { TaskMetadata } from "@/components/task/TaskMetadata";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Colors } from "@/constants/theme";
 import { Glass, Radius, Spacing } from "@/constants/tokens";
 import { getSourceTypeLabel } from "@/domain/sourceTimeline";
+import { computeTaskXp } from "@/domain/xpLevel";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useTaskItemEditing } from "@/hooks/useTaskItemEditing";
 
 interface TaskItemProps {
   task: NormalizedTask;
   onToggle: (id: string) => void;
   onUpdate: (id: string, patch: TaskUpdateInput) => void | Promise<void>;
   onDelete: (id: string) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onLongPress?: (id: string) => void;
+  onToggleSelection?: (id: string) => void;
 }
 
-export function TaskItem({ task, onToggle, onUpdate, onDelete }: TaskItemProps) {
-  const [expanded, setExpanded] = useState(false);
+export function TaskItem({ task, onToggle, onUpdate, onDelete, selectionMode, selected, onLongPress, onToggleSelection }: TaskItemProps) {
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailStartInEdit, setDetailStartInEdit] = useState(false);
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = Colors[colorScheme];
-
-  const hasDetails = !!(task.notes || task.sourceText);
-  const {
-    cancelEditing,
-    draftDueText,
-    draftNotes,
-    draftTitle,
-    editing,
-    saveDisabled,
-    saveEditing,
-    saving,
-    setDraftDueText,
-    setDraftNotes,
-    setDraftTitle,
-    startEditing,
-  } = useTaskItemEditing({ onUpdate, task });
   const sourceLabel = task.sourceId && task.sourceType
     ? getSourceTypeLabel(task.sourceType)
     : task.sourceId
@@ -64,20 +54,21 @@ export function TaskItem({ task, onToggle, onUpdate, onDelete }: TaskItemProps) 
   // Reanimated values for dopamine checkbox
   const checkScale = useSharedValue(1);
   const titleOpacity = useSharedValue(task.status === "done" ? 0.5 : 1);
+  const burstScale = useSharedValue(0);
+  const burstOpacity = useSharedValue(0);
+  const xpFloatY = useSharedValue(0);
+  const xpFloatOpacity = useSharedValue(0);
+  const xpGained = useRef(0);
 
   useEffect(() => {
     titleOpacity.value = withTiming(task.status === "done" ? 0.5 : 1, { duration: 300 });
   }, [task.status, titleOpacity]);
 
-  const toggleExpand = () => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExpanded((v) => !v);
-  };
-
   const handleToggle = () => {
+    const completing = task.status !== "done";
     if (Platform.OS !== "web") {
       Haptics.impactAsync(
-        task.status === "done" ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium
+        completing ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light
       );
     }
     // Bouncy scale animation
@@ -85,12 +76,44 @@ export function TaskItem({ task, onToggle, onUpdate, onDelete }: TaskItemProps) 
       withTiming(0.7, { duration: 100 }),
       withSpring(1, { damping: 10, stiffness: 300 })
     );
+    // Burst animation on completion
+    if (completing) {
+      burstScale.value = 0;
+      burstOpacity.value = 1;
+      burstScale.value = withTiming(3, { duration: 400 });
+      burstOpacity.value = withTiming(0, { duration: 400 });
+      // XP float animation
+      xpGained.current = computeTaskXp(task);
+      xpFloatY.value = 0;
+      xpFloatOpacity.value = 1;
+      xpFloatY.value = withTiming(-40, { duration: 1200 });
+      xpFloatOpacity.value = withTiming(0, { duration: 1200 });
+    }
     onToggle(task.id);
+  };
+
+  const handleOpenDetail = (startInEdit = false) => {
+    setDetailStartInEdit(startInEdit);
+    setDetailVisible(true);
   };
 
   const animatedCheckboxStyle = useAnimatedStyle(() => {
     return {
       transform: [{ scale: checkScale.value }],
+    };
+  });
+
+  const animatedBurstStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: burstScale.value }],
+      opacity: burstOpacity.value,
+    };
+  });
+
+  const animatedXpFloatStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: xpFloatY.value }],
+      opacity: xpFloatOpacity.value,
     };
   });
 
@@ -100,42 +123,62 @@ export function TaskItem({ task, onToggle, onUpdate, onDelete }: TaskItemProps) 
     };
   });
 
-  const handleStartEditing = () => {
-    setExpanded(true);
-    startEditing();
-  };
-
   return (
-    <GlassCard style={styles.taskSurface}>
+    <GlassCard style={[styles.taskSurface, selected && { borderColor: colors.tint, borderWidth: 1.5 }]}>
       <View
         style={[
           styles.taskRow,
-          (editing || (expanded && hasDetails)) && {
-            borderBottomColor: Glass.border[colorScheme],
-            borderBottomWidth: StyleSheet.hairlineWidth,
-            paddingBottom: Spacing.sm,
-          },
         ]}
       >
+        {task.priority && task.priority !== "none" && (
+          <View style={[styles.priorityBar, { backgroundColor: priorityColor(task.priority, colorScheme) }]} />
+        )}
+        {selectionMode ? (
+          <TouchableOpacity
+            onPress={() => onToggleSelection?.(task.id)}
+            style={styles.checkboxTouch}
+            accessibilityLabel={selected ? "取消选择" : "选择"}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: selected }}
+          >
+            <MaterialIcons
+              name={selected ? "check-box" : "check-box-outline-blank"}
+              size={20}
+              color={selected ? colors.tint : colors.icon}
+            />
+          </TouchableOpacity>
+        ) : (
         <TouchableOpacity
           onPress={handleToggle}
           style={styles.checkboxTouch}
           accessibilityLabel={task.status === "done" ? "标记为未完成" : "标记为完成"}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: task.status === "done" }}
           activeOpacity={0.8}
         >
-          <Animated.View
-            style={[
-              styles.checkbox,
-              {
-                borderColor: Glass.border[colorScheme],
-              },
-              task.status === "done" && {
-                backgroundColor: colors.tint,
-                borderColor: colors.tint,
-              },
-              animatedCheckboxStyle,
-            ]}
-          >
+          <View style={styles.checkboxContainer}>
+            <Animated.View
+              style={[
+                styles.burstRing,
+                {
+                  borderColor: colors.tint,
+                },
+                animatedBurstStyle,
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.checkbox,
+                {
+                  borderColor: Glass.border[colorScheme],
+                },
+                task.status === "done" && {
+                  backgroundColor: colors.tint,
+                  borderColor: colors.tint,
+                },
+                animatedCheckboxStyle,
+              ]}
+            >
             {task.status === "done" && (
               <MaterialIcons
                 name="check"
@@ -143,42 +186,55 @@ export function TaskItem({ task, onToggle, onUpdate, onDelete }: TaskItemProps) 
                 color={colorScheme === "dark" ? "#0b0d0e" : "#fff"}
               />
             )}
-          </Animated.View>
+            </Animated.View>
+            <Animated.View style={[styles.xpFloat, animatedXpFloatStyle]} pointerEvents="none">
+              <Text style={[styles.xpFloatText, { color: colors.tint }]}>
+                +{xpGained.current} XP
+              </Text>
+            </Animated.View>
+          </View>
         </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.taskContent}
-          onPress={!editing && hasDetails ? toggleExpand : undefined}
-          activeOpacity={!editing && hasDetails ? 0.6 : 1}
+          onPress={selectionMode ? () => onToggleSelection?.(task.id) : () => handleOpenDetail()}
+          activeOpacity={0.6}
+          onLongPress={selectionMode ? undefined : () => onLongPress?.(task.id)}
+          accessibilityLabel={`查看任务: ${task.title}`}
+          accessibilityRole="button"
         >
-          <Animated.View style={animatedTitleStyle}>
+          <Animated.View style={[animatedTitleStyle, styles.titleRow]}>
+            {task.recurrence && (
+              <MaterialIcons name="repeat" size={12} color={colors.tint} style={styles.recurrenceIcon} />
+            )}
             <ThemedText
               style={[
                 styles.taskTitle,
                 task.status === "done" && styles.taskDone,
               ]}
-              numberOfLines={expanded ? undefined : 1}
+              numberOfLines={1}
             >
               {task.title}
             </ThemedText>
           </Animated.View>
           <TaskMetadata
-            expanded={expanded}
-            hasDetails={hasDetails}
+            expanded={false}
+            hasDetails={!!(task.notes || task.sourceText)}
             onConfirmTime={() => void onUpdate(task.id, { timeStatus: "confirmed" })}
             sourceLabel={sourceLabel}
             task={task}
           />
         </TouchableOpacity>
 
+        {!selectionMode && (
         <View style={styles.rowActions}>
           <TouchableOpacity
-            onPress={handleStartEditing}
+            onPress={() => handleOpenDetail(true)}
             style={[
               styles.actionIconBtn,
               { backgroundColor: Glass.inputBackground[colorScheme], borderColor: Glass.border[colorScheme] },
             ]}
-            disabled={editing}
             accessibilityLabel="编辑任务"
           >
             <MaterialIcons name="edit" size={14} color={colors.tint} />
@@ -194,25 +250,19 @@ export function TaskItem({ task, onToggle, onUpdate, onDelete }: TaskItemProps) 
             <MaterialIcons name="close" size={14} color={colors.icon} />
           </TouchableOpacity>
         </View>
+        )}
       </View>
 
-      {editing && (
-        <TaskEditForm
-          draftDueText={draftDueText}
-          draftNotes={draftNotes}
-          draftTitle={draftTitle}
-          onCancel={cancelEditing}
-          onChangeDueText={setDraftDueText}
-          onChangeNotes={setDraftNotes}
-          onChangeTitle={setDraftTitle}
-          onSave={() => void saveEditing()}
-          saving={saving}
-          saveDisabled={saveDisabled}
-        />
-      )}
-
-      {!editing && expanded && hasDetails && (
-        <TaskDetails task={task} />
+      {!selectionMode && (
+      <TaskDetailModal
+        visible={detailVisible}
+        task={task}
+        onClose={() => setDetailVisible(false)}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        onToggleDone={onToggle}
+        startInEdit={detailStartInEdit}
+      />
       )}
     </GlassCard>
   );
@@ -222,6 +272,12 @@ const styles = StyleSheet.create({
   taskSurface: {
     borderRadius: Radius.card,
   },
+  priorityBar: {
+    width: 4,
+    borderRadius: 2,
+    marginRight: Spacing.xxs,
+    alignSelf: "stretch",
+  },
   taskRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -230,6 +286,17 @@ const styles = StyleSheet.create({
   checkboxTouch: {
     padding: Spacing.xxs,
     marginRight: Spacing.sm,
+  },
+  checkboxContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  burstRing: {
+    position: "absolute",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
   },
   checkbox: {
     width: 20,
@@ -247,9 +314,27 @@ const styles = StyleSheet.create({
   checkmarkDark: {
     color: "#11181C",
   },
+  xpFloat: {
+    position: "absolute",
+    top: -8,
+    left: "50%",
+    marginLeft: -24,
+  },
+  xpFloatText: {
+    fontSize: 12,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+  },
   taskContent: {
     flex: 1,
     paddingVertical: 2,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  recurrenceIcon: {
+    marginRight: 4,
   },
   taskTitle: {
     fontSize: 15,

@@ -1,45 +1,25 @@
-import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
-import { requestNotificationPermissions } from '@/providers/notificationProvider';
-import { AuthProvider, useAuth } from '@/providers/AuthContext';
+import { AuthProvider } from '@/providers/AuthContext';
+import { DraftCountProvider } from '@/providers/DraftCountContext';
+import { useAuthMigration } from '@/hooks/useAuthMigration';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+function AuthMigrationGate({ children }: { children: React.ReactNode }) {
+  useAuthMigration();
+  return <>{children}</>;
+}
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-    const inAuthGroup = segments[0] === 'auth';
-
-    if (!user && !inAuthGroup) {
-      router.replace('/auth');
-    } else if (user && inAuthGroup) {
-      router.replace('/');
-    }
-  }, [user, loading, segments, router]);
-
-  if (loading) return null; // Or a splash screen
-  return <>{children}</>;
-}
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-
-  useEffect(() => {
-    // Request notification permissions when the app mounts
-    void requestNotificationPermissions();
-  }, []);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -206,17 +186,19 @@ export default function RootLayout() {
           }
         ` }} />
       )}
+      <DraftCountProvider>
       <AuthProvider>
-        <AuthGuard>
+        <AuthMigrationGate>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             <Stack.Screen name="theme-editor" options={{ presentation: 'modal', title: '自定义主题' }} />
             <Stack.Screen name="source-library" options={{ presentation: 'modal', title: '来源库' }} />
-            <Stack.Screen name="auth" options={{ presentation: 'modal', title: '登录/注册', gestureEnabled: false, headerShown: false }} />
+            <Stack.Screen name="auth" options={{ presentation: 'modal', title: '登录/注册', headerShown: false }} />
           </Stack>
-        </AuthGuard>
+        </AuthMigrationGate>
       </AuthProvider>
+      </DraftCountProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
   );

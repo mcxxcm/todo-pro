@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import Constants from "expo-constants";
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { getTodoistToken, setTodoistToken, removeTodoistToken } from "@/lib/todoistStorage";
 import { setThemePreset } from "@/lib/themeStorage";
 import { ThemePresetId } from "@/constants/themePresets";
@@ -18,13 +19,24 @@ import { BackendHealth, fetchBackendHealth } from "@/lib/backendHealth";
 import { InboxQualityPanel } from "@/components/settings/InboxQualityPanel";
 import { LocalDataPanel } from "@/components/settings/LocalDataPanel";
 import { SettingsStatusPanel } from "@/components/settings/SettingsStatusPanel";
+import { StatsPanel } from "@/components/settings/StatsPanel";
+import { SourceEfficiencyPanel } from "@/components/settings/SourceEfficiencyPanel";
+import { WeeklyReportPanel } from "@/components/settings/WeeklyReportPanel";
+import { AchievementGallery } from "@/components/settings/AchievementGallery";
 import { SyncTargetsPanel } from "@/components/settings/SyncTargetsPanel";
 import { ThemePickerPanel } from "@/components/settings/ThemePickerPanel";
+import { useAuth } from "@/providers/AuthContext";
+import { useTasks } from "@/hooks/useTasks";
+import * as Notifications from "expo-notifications";
+import { getNotificationsEnabled, setNotificationsEnabled } from "@/lib/notificationSettings";
+import { requestNotificationPermissions } from "@/providers/notificationProvider";
+import type { Achievement } from "@/domain/achievements";
 import {
   clearAllLocalData,
   exportAllLocalData,
   getLocalDataSummary,
   LocalDataSummary,
+  shareAllLocalData,
 } from "@/providers/localDataProvider";
 import {
   getSyncPreflight,
@@ -40,6 +52,8 @@ import type { SyncPreflight } from "@/domain/syncPreflight";
 export default function SettingsScreen() {
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = Colors[colorScheme];
+  const { tasks } = useTasks();
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [summary, setSummary] = useState<LocalDataSummary>({
     drafts: 0,
     quality: {
@@ -75,10 +89,14 @@ export default function SettingsScreen() {
   const [backendHealth, setBackendHealth] = useState<BackendHealth | null>(null);
   const [exportSnapshot, setExportSnapshot] = useState<{
     exportedAt: string;
+    fileUri?: string;
+    shared?: boolean;
     size: number;
   } | null>(null);
   const [syncingProvider, setSyncingProvider] = useState<TaskProvider | null>(null);
   const [todoistToken, setTodoistTokenState] = useState("");
+  const [notificationsEnabled, setNotificationsEnabledState] = useState(true);
+  const { user, logOut } = useAuth();
 
   useEffect(() => {
     async function loadToken() {
@@ -86,6 +104,10 @@ export default function SettingsScreen() {
       if (token) setTodoistTokenState(token);
     }
     void loadToken();
+  }, []);
+
+  useEffect(() => {
+    void getNotificationsEnabled().then(setNotificationsEnabledState);
   }, []);
 
   const handleSaveTodoistToken = async (val: string) => {
@@ -190,6 +212,37 @@ export default function SettingsScreen() {
     });
   };
 
+  const handleShareLocalData = async () => {
+    const result = await shareAllLocalData();
+    setExportSnapshot({
+      exportedAt: result.exportedAt,
+      fileUri: result.fileUri,
+      shared: result.shared,
+      size: result.size,
+    });
+  };
+
+  const handleAuthAction = async () => {
+    if (user) {
+      await logOut();
+      await refreshSummary();
+      return;
+    }
+    router.push("/auth");
+  };
+
+  const handleToggleNotifications = async () => {
+    const next = !notificationsEnabled;
+    if (next) {
+      const granted = await requestNotificationPermissions();
+      if (!granted) return;
+    } else {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    }
+    setNotificationsEnabledState(next);
+    await setNotificationsEnabled(next);
+  };
+
   return (
     <View
       style={[
@@ -253,6 +306,52 @@ export default function SettingsScreen() {
           backendHealth={backendHealth}
         />
 
+        <StatsPanel tasks={tasks} />
+
+        <SourceEfficiencyPanel tasks={tasks} />
+
+        <WeeklyReportPanel tasks={tasks} />
+
+        <AchievementGallery
+          tasks={tasks}
+          onAchievementUnlocked={(achievement: Achievement) => {
+            setToastMessage(`🏆 解锁成就：${achievement.title}`);
+            setTimeout(() => setToastMessage(null), 2500);
+          }}
+        />
+
+        <GlassCard style={styles.panel}>
+          <View style={styles.panelHeader}>
+            <View style={styles.panelTitleGroup}>
+              <MaterialIcons
+                name={user ? "cloud-done" : "cloud-off"}
+                size={17}
+                color={colors.tint}
+              />
+              <Text style={[styles.panelTitle, { color: colors.text }]}>
+                账号与同步
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => void handleAuthAction()}
+              activeOpacity={0.7}
+              style={[
+                styles.accountButton,
+                { borderColor: Glass.border[colorScheme] },
+              ]}
+            >
+              <Text style={[styles.accountButtonText, { color: colors.tint }]}>
+                {user ? "退出" : "登录"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.bodyText, { color: colors.icon }]}>
+            {user
+              ? `已登录：${user.email ?? "Firebase 用户"}。当前任务使用云端同步。`
+              : "当前为本地模式，任务、草稿和来源只保存在本机。登录后可开启云端任务同步。"}
+          </Text>
+        </GlassCard>
+
         <InboxQualityPanel quality={summary.quality} />
 
         <ThemePickerPanel
@@ -261,6 +360,36 @@ export default function SettingsScreen() {
           onCreateTheme={() => router.push("/theme-editor")}
           onSelectTheme={(presetId) => void handleSelectTheme(presetId)}
         />
+
+        <GlassCard style={styles.panel}>
+          <View style={styles.panelHeader}>
+            <View style={styles.panelTitleGroup}>
+              <MaterialIcons name="notifications" size={17} color={colors.tint} />
+              <Text style={[styles.panelTitle, { color: colors.text }]}>
+                通知
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => void handleToggleNotifications()}
+              activeOpacity={0.7}
+              style={[
+                styles.toggleButton,
+                {
+                  backgroundColor: notificationsEnabled ? colors.tint : Glass.inputBackground[colorScheme],
+                  borderColor: notificationsEnabled ? colors.tint : Glass.border[colorScheme],
+                },
+              ]}
+              accessibilityLabel={notificationsEnabled ? "关闭通知" : "开启通知"}
+            >
+              <View style={[styles.toggleKnob, notificationsEnabled && styles.toggleKnobOn]} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.bodyText, { color: colors.icon }]}>
+            {notificationsEnabled
+              ? "任务到期提醒已开启。截止时间到达时会推送通知。"
+              : "任务到期提醒已关闭。开启后将请求通知权限。"}
+          </Text>
+        </GlassCard>
 
         <SyncTargetsPanel
           onSaveTodoistToken={(value) => void handleSaveTodoistToken(value)}
@@ -290,11 +419,59 @@ export default function SettingsScreen() {
           exportSnapshot={exportSnapshot}
           onClearLocalData={() => void handleClearLocalData()}
           onCreateExportSnapshot={() => void handleCreateExportSnapshot()}
+          onShareLocalData={() => void handleShareLocalData()}
           onOpenSourceLibrary={() => router.push("/source-library")}
           onRefresh={() => void refreshSummary()}
           summary={summary}
         />
+
+        <GlassCard style={styles.panel}>
+          <View style={styles.panelTitleGroup}>
+            <MaterialIcons name="info" size={17} color={colors.tint} />
+            <Text style={[styles.panelTitle, { color: colors.text }]}>关于</Text>
+          </View>
+          <View style={styles.aboutGrid}>
+            <View style={styles.aboutRow}>
+              <Text style={[styles.aboutLabel, { color: colors.icon }]}>版本</Text>
+              <Text style={[styles.aboutValue, { color: colors.text }]}>
+                {Constants.expoConfig?.version ?? "1.0.0"} (build {Constants.expoConfig?.ios?.buildNumber ?? Constants.expoConfig?.android?.versionCode ?? "1"})
+              </Text>
+            </View>
+            <View style={styles.aboutRow}>
+              <Text style={[styles.aboutLabel, { color: colors.icon }]}>平台</Text>
+              <Text style={[styles.aboutValue, { color: colors.text }]}>Expo SDK 55</Text>
+            </View>
+            <View style={styles.aboutRow}>
+              <Text style={[styles.aboutLabel, { color: colors.icon }]}>许可</Text>
+              <Text style={[styles.aboutValue, { color: colors.text }]}>MIT License</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={() => Linking.openURL("mailto:feedback@todopro.app")}
+            style={[styles.aboutLink, { borderColor: Glass.border[colorScheme] }]}
+            accessibilityLabel="发送反馈邮件"
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="mail-outline" size={14} color={colors.tint} />
+            <Text style={[styles.aboutLinkText, { color: colors.tint }]}>反馈 / Bug 报告</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => Linking.openURL("https://todopro.app/privacy")}
+            style={[styles.aboutLink, { borderColor: Glass.border[colorScheme] }]}
+            accessibilityLabel="查看隐私政策"
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="privacy-tip" size={14} color={colors.tint} />
+            <Text style={[styles.aboutLinkText, { color: colors.tint }]}>隐私政策</Text>
+          </TouchableOpacity>
+        </GlassCard>
       </ScrollView>
+
+      {toastMessage && (
+        <View style={[styles.toast, { backgroundColor: Glass.inputBackground[colorScheme], borderColor: colors.tint }]}>
+          <Text style={[styles.toastText, { color: colors.text }]}>{toastMessage}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -342,10 +519,28 @@ const styles = StyleSheet.create({
   panel: {
     borderRadius: Radius.card,
   },
+  panelHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: Spacing.sm,
+    justifyContent: "space-between",
+  },
   panelTitleGroup: {
     alignItems: "center",
     flexDirection: "row",
     gap: Spacing.xs,
+  },
+  accountButton: {
+    alignItems: "center",
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 30,
+    justifyContent: "center",
+    paddingHorizontal: Spacing.sm,
+  },
+  accountButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
   },
   panelTitle: {
     fontSize: 15,
@@ -374,5 +569,69 @@ const styles = StyleSheet.create({
   errorRetry: {
     fontSize: 13,
     fontWeight: "800",
+  },
+  toast: {
+    position: "absolute",
+    bottom: 20,
+    left: Spacing.lg,
+    right: Spacing.lg,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  toastText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  toggleButton: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    paddingHorizontal: 2,
+  },
+  toggleKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#fff",
+    alignSelf: "flex-start",
+  },
+  toggleKnobOn: {
+    alignSelf: "flex-end",
+  },
+  aboutGrid: {
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  aboutRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  aboutLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  aboutValue: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  aboutLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+  },
+  aboutLinkText: {
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

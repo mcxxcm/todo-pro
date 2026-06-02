@@ -1,5 +1,5 @@
-const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
-const CN_DIGITS: Record<string, number> = {
+export const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
+export const CN_DIGITS: Record<string, number> = {
   零: 0,
   〇: 0,
   一: 1,
@@ -15,14 +15,14 @@ const CN_DIGITS: Record<string, number> = {
   十: 10,
   廿: 20,
 };
-const CN_NUMBER_PATTERN = "[零〇一二两三四五六七八九十廿]+";
+export const CN_NUMBER_PATTERN = "[零〇一二两三四五六七八九十廿]+";
 
 export interface ClientDateInfo {
   dueText: string;
   dueAt: string;
 }
 
-function parseChineseNumber(value: string): number | null {
+export function parseChineseNumber(value: string): number | null {
   if (value in CN_DIGITS) return CN_DIGITS[value];
 
   const normalized = value.replace(/两/g, "二");
@@ -43,7 +43,7 @@ function parseNumber(value: string): number | null {
   return parseChineseNumber(value);
 }
 
-function normalizeHour(hour: number, text: string): number {
+export function normalizeHour(hour: number, text: string): number {
   if (/凌晨/.test(text)) return hour === 12 ? 0 : hour;
   if (/中午/.test(text)) return hour < 11 ? hour + 12 : hour;
   if (/下午|晚上|傍晚|今晚|明晚/.test(text) && hour < 12) {
@@ -52,7 +52,7 @@ function normalizeHour(hour: number, text: string): number {
   return hour;
 }
 
-function parseTimeOfDay(text: string): { hour: number; minute: number } | null {
+export function parseTimeOfDay(text: string): { hour: number; minute: number } | null {
   const numericTime = text.match(
     /(?:凌晨|下午|晚上|傍晚|上午|早上|中午)?\s*(\d{1,2})\s*[：:](\d{1,2})/,
   );

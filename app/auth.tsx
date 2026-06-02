@@ -27,11 +27,16 @@ export default function AuthScreen() {
         await signUp(email, password);
       }
       router.replace('/');
-    } catch (e) {
+    } catch {
       // Error is handled in context
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleContinueLocal = () => {
+    clearError();
+    router.replace('/');
   };
 
   return (
@@ -43,7 +48,7 @@ export default function AuthScreen() {
             {isLogin ? '登录 Todo Pro' : '注册 Todo Pro'}
           </Text>
           <Text style={[styles.subtitle, { color: textColor }]}>
-            登录以开启全平台极速跨端同步
+            不登录也可以先使用本地收件箱；登录后开启跨端同步
           </Text>
         </View>
 
@@ -75,6 +80,9 @@ export default function AuthScreen() {
           style={[styles.button, { backgroundColor: tintColor }]} 
           onPress={handleAuth}
           disabled={isLoading}
+          accessibilityLabel={isLogin ? "登录" : "注册"}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isLoading }}
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
@@ -86,9 +94,22 @@ export default function AuthScreen() {
         <TouchableOpacity 
           style={styles.switchButton} 
           onPress={() => { setIsLogin(!isLogin); clearError(); }}
+          accessibilityLabel={isLogin ? "切换到注册" : "切换到登录"}
+          accessibilityRole="button"
         >
           <Text style={[styles.switchText, { color: tintColor }]}>
             {isLogin ? '没有账号？点击注册' : '已有账号？点击登录'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.localButton, { borderColor: tintColor + '40' }]}
+          onPress={handleContinueLocal}
+          accessibilityLabel="继续本地使用，不登录"
+          accessibilityRole="button"
+        >
+          <Text style={[styles.localButtonText, { color: tintColor }]}>
+            继续本地使用
           </Text>
         </TouchableOpacity>
       </View>
@@ -152,6 +173,18 @@ const styles = StyleSheet.create({
   switchButton: {
     marginTop: 24,
     alignItems: 'center',
+  },
+  localButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 46,
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  localButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   switchText: {
     fontSize: 14,

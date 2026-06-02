@@ -14,22 +14,30 @@ import {
   StyleSheet,
   TextInput,
   Text,
+  TouchableOpacity,
   View,
   useWindowDimensions,
   Platform,
 } from "react-native";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { GlassButton } from "@/components/ui/GlassButton";
+import { PriorityPicker } from "@/components/task/PriorityPicker";
+import { DatePickerModal } from "@/components/task/DatePickerModal";
+import { TagInput } from "@/components/task/TagInput";
 import { Colors } from "@/constants/theme";
 import { Glass, Opacity, Radius, Spacing } from "@/constants/tokens";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import type { TaskPriority } from "@/types/task";
 
 interface TaskComposerProps {
-  onAdd: (title: string) => Promise<unknown> | unknown;
+  onAdd: (title: string, priority?: TaskPriority, dueAt?: string, dueText?: string, tags?: string[]) => Promise<unknown> | unknown;
   onExtract?: (text: string) => void;
   extracting?: boolean;
   onImagePicked?: (base64: string) => void;
   ocrScanning?: boolean;
+  priority?: TaskPriority;
+  onPriorityChange?: (p: TaskPriority) => void;
+  availableTags?: string[];
 }
 
 async function uriToBase64(uri: string): Promise<string> {
@@ -55,9 +63,16 @@ export function TaskComposer({
   extracting,
   onImagePicked,
   ocrScanning,
+  priority,
+  onPriorityChange,
+  availableTags,
 }: TaskComposerProps) {
   const [inputText, setInputText] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [selectedDueAt, setSelectedDueAt] = useState("");
+  const [selectedDueText, setSelectedDueText] = useState("");
+  const [composerTags, setComposerTags] = useState<string[]>([]);
   const inputRef = useRef<TextInput>(null);
   const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
@@ -115,11 +130,24 @@ export function TaskComposer({
   const handleAdd = async () => {
     if (!canSubmit) return;
     triggerHaptic();
-    const result = await onAdd(inputText);
+    const result = await onAdd(inputText, priority, selectedDueAt || undefined, selectedDueText || undefined, composerTags.length > 0 ? composerTags : undefined);
     if (result !== undefined) {
       setInputText("");
+      setSelectedDueAt("");
+      setSelectedDueText("");
+      setComposerTags([]);
       inputRef.current?.clear();
       handleBlur();
+    }
+  };
+
+  const handleDateSelect = (iso: string, display: string) => {
+    if (iso) {
+      setSelectedDueAt(iso);
+      setSelectedDueText(display);
+    } else {
+      setSelectedDueAt("");
+      setSelectedDueText("");
     }
   };
 
@@ -192,6 +220,18 @@ export function TaskComposer({
             />
           </View>
           <View style={[styles.buttonGroup, compact && styles.buttonGroupCompact]}>
+            <GlassButton
+              style={[styles.ocrButton, selectedDueText ? { borderColor: colors.tint } : undefined]}
+              onPress={() => setDatePickerVisible(true)}
+              disabled={ocrScanning || extracting}
+              accessibilityLabel="选择日期"
+            >
+              <MaterialIcons
+                name="calendar-today"
+                size={16}
+                color={selectedDueText ? colors.tint : colors.icon}
+              />
+            </GlassButton>
             {onImagePicked && (
               <>
                 <GlassButton
@@ -270,6 +310,30 @@ export function TaskComposer({
             </GlassButton>
           </View>
         </View>
+        {isFocused && (
+          <View style={styles.expandedSection}>
+            {onPriorityChange && (
+              <PriorityPicker value={priority ?? "none"} onChange={onPriorityChange} />
+            )}
+            <TagInput
+              tags={composerTags}
+              onChange={setComposerTags}
+              suggestions={availableTags}
+            />
+          </View>
+        )}
+        {selectedDueText ? (
+          <View style={styles.dateChipRow}>
+            <MaterialIcons name="event" size={12} color={colors.tint} />
+            <Text style={[styles.dateChipText, { color: colors.tint }]}>
+              {selectedDueText}
+            </Text>
+            <TouchableOpacity onPress={() => { setSelectedDueAt(""); setSelectedDueText(""); }}
+              accessibilityLabel="清除日期">
+              <MaterialIcons name="close" size={12} color={colors.icon} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {ocrScanning && (
           <View style={styles.ocrStatus}>
             <MaterialIcons name="hourglass-top" size={14} color={colors.tint} />
@@ -279,6 +343,13 @@ export function TaskComposer({
           </View>
         )}
       </AnimatedGlassCard>
+
+      <DatePickerModal
+        visible={datePickerVisible}
+        onClose={() => setDatePickerVisible(false)}
+        onSelect={handleDateSelect}
+        initialDate={selectedDueAt || undefined}
+      />
     </View>
   );
 }
@@ -339,6 +410,23 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 44,
     paddingHorizontal: Spacing.sm,
+  },
+  expandedSection: {
+    paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.xxs,
+    gap: Spacing.sm,
+  },
+  dateChipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.xxs,
+  },
+  dateChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    flex: 1,
   },
   ocrStatus: {
     alignItems: "center",

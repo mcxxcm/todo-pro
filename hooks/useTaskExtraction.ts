@@ -146,12 +146,12 @@ export function useTaskExtraction() {
   const updateCandidate = useCallback(
     (
       id: string,
-      field: "title" | "dueText" | "dueAt" | "timeStatus",
-      value: string | undefined,
+      field: "title" | "dueText" | "dueAt" | "timeStatus" | "tags",
+      value: string | string[] | undefined,
     ) => {
       void updateLocalDraft(id, {
         [field]: field === "timeStatus" ? (value as TimeStatus) : value,
-      }).catch((err) => {
+      } as any).catch((err) => {
         console.warn("[updateCandidate] Failed to persist draft update:", err);
       });
       setCandidates((prev) =>

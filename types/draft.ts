@@ -31,5 +31,6 @@ export type TaskDraftUpdateInput = Partial<
     | "confidence"
     | "status"
     | "acceptedTaskId"
+    | "tags"
   >
 >;

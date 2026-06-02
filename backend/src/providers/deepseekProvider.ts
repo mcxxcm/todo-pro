@@ -218,3 +218,96 @@ export async function extractTasksWithDeepSeek(
 
   throw lastError ?? new Error("DeepSeek extraction failed");
 }
+
+export interface DecomposeInput {
+  title: string;
+  notes?: string;
+  dueAt?: string;
+}
+
+export interface DecomposeResult {
+  subtasks: { title: string; estimatedMinutes: number }[];
+}
+
+function buildDecompositionPrompt(task: DecomposeInput): { role: string; content: string }[] {
+  const contextLines = [
+    `请将以下任务拆解成 3-7 个可执行的子任务：`,
+    `主任务：${task.title}`,
+  ];
+  if (task.notes) contextLines.push(`备注：${task.notes}`);
+  if (task.dueAt) contextLines.push(`截止日期：${new Date(task.dueAt).toLocaleDateString("zh-CN")}`);
+
+  const systemPrompt = `You are a task decomposition assistant. Break down a complex task into concrete, executable subtasks.
+
+Return a JSON object with this exact schema:
+{
+  "subtasks": [
+    { "title": "specific actionable subtask", "estimatedMinutes": 30 }
+  ]
+}
+
+Rules:
+- Create 3-7 subtasks that are each concrete and independently actionable
+- Order them logically
+- estimatedMinutes should be between 5 and 480
+- Return ONLY this JSON object, no other text.`;
+
+  return [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: contextLines.join("\n") },
+  ];
+}
+
+export async function decomposeWithDeepSeek(
+  input: DecomposeInput,
+): Promise<DecomposeResult> {
+  const apiKey = requireDeepSeekApiKey();
+  validateApiKey(apiKey);
+  const baseUrl = (process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com").replace(/\/+$/, "");
+  const model = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
+
+  const messages = buildDecompositionPrompt(input);
+  const TIMEOUT_MS = 30_000;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model, messages, response_format: { type: "json_object" } }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`DeepSeek API error ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content: string | undefined = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty response");
+
+    const parsed = JSON.parse(stripCodeFence(content));
+    if (!parsed.subtasks || !Array.isArray(parsed.subtasks)) {
+      return { subtasks: [] };
+    }
+
+    return {
+      subtasks: parsed.subtasks.slice(0, 20).map((s: any) => ({
+        title: String(s.title ?? "").trim(),
+        estimatedMinutes: Math.max(5, Math.min(480, Number(s.estimatedMinutes) || 30)),
+      })).filter((s: { title: string }) => s.title.length > 0),
+    };
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Request timed out");
+    }
+    throw err;
+  }
+}

@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SCHEMA_VERSION_KEY = "@todopro:schema_version";
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
 
 interface Migration {
   version: number;
@@ -9,27 +9,21 @@ interface Migration {
   migrate: () => Promise<void>;
 }
 
-/**
- * Registry of data migrations. Each migration transforms the local storage
- * schema from one version to the next. Migrations MUST be idempotent.
- *
- * To add a new migration:
- * 1. Increment CURRENT_SCHEMA_VERSION
- * 2. Add a new Migration entry with the target version number
- */
+const TASKS_KEY = "@todopro:tasks";
+
 const MIGRATIONS: Migration[] = [
-  // Example future migration:
-  // {
-  //   version: 2,
-  //   description: "Add priority field to existing tasks",
-  //   migrate: async () => {
-  //     const raw = await AsyncStorage.getItem("@todopro:tasks");
-  //     if (!raw) return;
-  //     const tasks = JSON.parse(raw);
-  //     const updated = tasks.map((t: any) => ({ ...t, priority: t.priority ?? "none" }));
-  //     await AsyncStorage.setItem("@todopro:tasks", JSON.stringify(updated));
-  //   },
-  // },
+  {
+    version: 2,
+    description: "Add v2 fields (subtasks, recurrence, estimatedMinutes, actualMinutes, completedAt, xp, focusSessions) to existing tasks",
+    migrate: async () => {
+      const raw = await AsyncStorage.getItem(TASKS_KEY);
+      if (!raw) return;
+      const tasks = JSON.parse(raw);
+      if (!Array.isArray(tasks)) return;
+      // All new fields are optional — existing tasks are forward-compatible.
+      // Migration exists to stamp the schema version; no data transform needed.
+    },
+  },
 ];
 
 async function getCurrentVersion(): Promise<number> {

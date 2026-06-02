@@ -12,7 +12,12 @@ import {
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { NormalizedTask } from "@/types/task";
 
-interface WorkspaceSidebarProps {
+/**
+ * 宽屏筛选侧栏 — 当前仅提供任务分组筛选和草稿入口。
+ * 注意：这不是多工作区管理组件，多工作区功能计划在 Phase 3。
+ */
+
+interface FilterSidebarProps {
   tasks: NormalizedTask[];
   draftCount: number;
   activeFilter: TaskGroupFilter;
@@ -20,13 +25,13 @@ interface WorkspaceSidebarProps {
   onReviewPress?: () => void;
 }
 
-export function WorkspaceSidebar({
+export function FilterSidebar({
   tasks,
   draftCount,
   activeFilter,
   onFilterChange,
   onReviewPress,
-}: WorkspaceSidebarProps) {
+}: FilterSidebarProps) {
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = Colors[colorScheme];
   const counts = getTaskGroupCounts(tasks);

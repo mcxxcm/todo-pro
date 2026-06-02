@@ -1,204 +1,249 @@
-Todo Pro 项目企划书与开发进度总结
-版本：2026-05-27 更新版（加入本地运行策略与 macOS 26 风格 UI/动画方向）
+# Todo Pro 项目企划书与开发进度总结
 
-1. 一句话定位
-Todo Pro 是一个“多来源 AI 任务收件箱”：用户把聊天、网页、截图、邮件、PDF 或授权应用中的信息交给它，它先生成可确认的任务草稿，再由用户审核、编辑、保存或同步到常用待办工具。
-2. 用户问题与机会
+版本：2026-06-01 更新版（加入 Phase 2 domain 层开发、macOS 快捷键工具）
+
+---
+
+## 1. 一句话定位
+
+Todo Pro 是一个"多来源 AI 任务收件箱"：用户把聊天、网页、截图、邮件、PDF 或授权应用中的信息交给它，它先生成可确认的任务草稿，再由用户审核、编辑、保存或同步到常用待办工具。
+
+---
+
+## 2. 用户问题与机会
+
 用户的待办事项分散在微信/聊天、网页、邮件、截图、课程通知、文档和日历信息中，手动复制粘贴成本高。
 现有待办工具擅长管理任务，但通常不擅长从复杂上下文中识别任务。
-手机系统 AI 助手、Trello、Todoist、Microsoft To Do 等方向有相似能力，但“多格式内容 -> AI 识别 -> 用户确认 -> 同步”的个人任务入口仍有差异化空间。
+手机系统 AI 助手、Trello、Todoist、Microsoft To Do 等方向有相似能力，但"多格式内容 -> AI 识别 -> 用户确认 -> 同步"的个人任务入口仍有差异化空间。
 项目优势应放在用户主动分享/授权、图片 OCR、多格式解析、任务确认卡片和隐私可控上。
-3. 产品原则
-先做本地闭环，再做 AI、OCR 和同步。
-AI/OCR 输出只作为建议，默认必须经过用户确认。
-保留来源追踪：每条任务应能解释来自哪段文本、截图或文件。
-模糊时间必须提示用户确认，例如“下周五”“明晚”“月底前”。
-不默认后台读取其他 App；优先使用用户主动分享、粘贴、上传或明确 OAuth 授权。
-移动端永远不存放 DeepSeek/OpenAI 等模型 API key，统一走后端 provider。
-Todo Pro 必须先成为独立可用的本地 AI 任务备忘录/收件箱，再逐步成为外部 App 的输入源或同步目标。
-动画必须解释状态变化，不为装饰而装饰；效率工具优先清晰、安静、可信、快速。
-4. 当前技术栈与开发方式
-模块
-当前选择
-App
-Expo + React Native + TypeScript
-路由
-Expo Router
-本地存储
-AsyncStorage 优先；任务量和查询复杂后再升级 SQLite
-日期处理
-dayjs + 中文模糊时间确认规则
-AI 接入
-后端 API provider 层，移动端不放 key
-UI/动画
-Calm Glass Productivity UI；轻 Liquid Glass 影响；优先 tokens + 组件底座
-协作方式
-ChatGPT 负责架构/产品/提示词/评审；DeepSeek/Claude Code 负责本地代码执行
 
-5. 已完成与已确认的进度
-已明确产品方向：Todo Pro 是个人 AI 任务收件箱，而不是简单待办清单。
-已确定 MVP 优先级：先完成本地任务闭环，再进入 AI 提取和审核卡片。
-已在 macOS 上推进 Expo/React Native 开发环境。
-已完成一次重要重构：app/(tabs)/index.tsx 从约 356 行缩减到约 70 行。
-已新增或拆出 components/TaskComposer.tsx 等组件。
-已观察到 TypeScript 错误主要是既有问题：ColorSchemeName 不能直接索引 theme 对象，相关文件包括 app/(tabs)/_layout.tsx、components/parallax-scroll-view.tsx、hooks/use-theme-color.ts。
-已补充项目架构协作 skill：architecture governor、implementation brief、code review gate。
-已确认外部 App 接入策略：先做本地 Source -> Draft -> Review -> Task 闭环，再做分享入口、OAuth、同步写回。
-已确认 UI 方向：大胆且极具视觉冲击力的极致版 Liquid Glass，强调通透感与沉浸式动态交互。
-6. 推荐 MVP 路线图
-阶段
-目标
-完成标准
-阶段 1：本地任务闭环
-新增、展示、编辑、完成/删除任务
-无需 AI，也能稳定管理任务
-阶段 2：任务分组
-Inbox / Today / Plan 基础分组
-任务列表具备基本组织能力
-阶段 3：Mock AI 提取
-用假数据模拟从文本提取任务草稿
-review cards 流程跑通
-阶段 4：确认卡片
-用户确认、编辑、拒绝 AI 任务草稿
-AI 结果不会直接污染正式任务
-阶段 5：后端 AI provider
-接入 DeepSeek provider 骨架
-移动端只调用后端，不暴露 key
-阶段 6：时间验证
-处理中文模糊日期和置信度
-模糊时间进入确认状态
-阶段 7：分享入口
-从系统 share sheet 接收文字
-用户可从外部内容进入 Todo Pro
-阶段 8：OCR 与同步
-截图 OCR、通知、Todoist/日历/提醒事项同步
-建立在本地模型稳定之后
-阶段 9：UI 体验精修
-统一 glass tokens、review card 动画、list motion
-界面具备 Apple 平台现代感，同时保持高可读性
-阶段 10：个性化主题引擎与高级交互
-开放用户自定义主题接口，允许用户定制应用的色彩与风格底座
-结合微动效与高级交互动画，提升软件整体的“高级感”与生命力
+---
 
-7. 本地运行与外部 App 集成策略
-核心决策：Todo Pro 先把识别能力和自己的备忘录/任务收件箱集成在一起，而不是一开始依赖外部 App 接口。
-推荐数据流
-外部内容来源  ↓Todo Pro Inbox  ↓AI/规则识别  ↓任务草稿 Draft  ↓用户审核 Review Card  ↓正式任务 Task  ↓可选同步到外部 App
-三层集成路线
-层级
-入口/能力
-优先级
-说明
-第一层：低成本输入
-复制粘贴、系统 Share Sheet、上传截图、上传 PDF/文本、手动输入聊天记录
-高
-用户主动提供内容，隐私风险最低，最适合 MVP 后期。
-第二层：只读授权
-Gmail/Outlook、Google Calendar、Notion、Slack/飞书/Teams 等 OAuth 读取
-中
-用户明确授权后读取选定范围，必须保留来源追踪和权限说明。
-第三层：同步/写回
-Apple Reminders、Google Calendar、Todoist、Notion database、Microsoft To Do
-低
-涉及冲突、限流、权限过期和双向状态一致性，必须等本地模型稳定后再做。
+## 3. 产品原则
 
-建议核心对象
-SourceItem {  id: string  type: 'text' | 'image' | 'pdf' | 'email' | 'share'  rawContent?: string  createdAt: string}TaskDraft {  id: string  sourceId: string  title: string  dueText?: string  dueDate?: string  confidence: number  needsReview: boolean  status: 'pending' | 'accepted' | 'rejected' | 'edited'}Task {  id: string  title: string  dueDate?: string  sourceId?: string  completed: boolean}
-8. UI 与动画设计方向：Vibrant & Bold Liquid Glass UI
-Todo Pro 应采用大胆且极具视觉表现力的“极致版 Liquid Glass”审美：极致通透的深层毛玻璃、全沉浸式的光影材质、以及富有张力与生命力的丰富空间层级动画。我们要打造令人惊艳的视觉奇观。
-视觉关键词
-vibrant
-ultra-translucent
-immersive
-expressive
-dynamic
-native-feeling
-设计原则
-Inbox 像柔和的玻璃托盘；Task Draft 像可确认的浮层卡片；Today/Plan 保持稳定清晰。
-AI 提取过程应表现为“内容沉淀成任务”，不要做成聊天机器人界面。
-Glass 效果只用于层级表达，不牺牲文字可读性。
-动画必须解释状态变化，例如生成、确认、编辑、拒绝、完成。
-尊重 Reduce Motion；如果当前项目尚未接入无障碍偏好，先预留 TODO。
-组件与主题建议
-components/ui/  GlassCard.tsx  GlassButton.tsx  FloatingActionButton.tsx  ReviewDraftCard.tsx  SourcePreviewCard.tsx  EmptyState.tsx  MotionListItem.tsxtheme/  tokens.ts  motion.ts  radius.ts  spacing.ts  shadows.ts
-个性化扩展：提供自定义主题生成接口 (Custom Theme Engine Interface)，支持用户自行调配色彩方案与材质参数。
-动画规则
-场景
-推荐动画
-不推荐
-新任务进入
-fade + translateY
-大幅弹跳
-草稿确认
-card morph / slide into list
-烟花、粒子、过度庆祝
-删除/拒绝
-fade out + shrink
-旋转飞走
-切换 tab
-subtle fade
-大幅横向滑动
-AI 提取中
-shimmer / pulsing dots
-长时间复杂 loading
-编辑卡片
-height transition
-页面整体跳动
+- 先做本地闭环，再做 AI、OCR 和同步。
+- AI/OCR 输出只作为建议，默认必须经过用户确认。
+- 保留来源追踪：每条任务应能解释来自哪段文本、截图或文件。
+- 模糊时间必须提示用户确认，例如"下周五""明晚""月底前"。
+- 不默认后台读取其他 App；优先使用用户主动分享、粘贴、上传或明确 OAuth 授权。
+- 移动端永远不存放 DeepSeek/OpenAI 等模型 API key，统一走后端 provider。
+- Todo Pro 必须先成为独立可用的本地 AI 任务备忘录/收件箱，再逐步成为外部 App 的输入源或同步目标。
+- 动画必须解释状态变化，不为装饰而装饰；效率工具优先清晰、安静、可信、快速。
 
-技术建议
-react-native-reanimated：核心动画能力。
-moti：快速实现进场/退场动画。
-expo-blur：实现 glass card，但必须提供可读 fallback。
-expo-linear-gradient：背景和微妙高光。
-react-native-gesture-handler：后期支持 swipe accept / reject。
-当前阶段只做设计系统底座：tokens、GlassCard、MotionListItem，并在一个现有页面试点，不做全局视觉重构。
-9. 下一步开发建议
-现在最值得做的是：后端环境变量 + DeepSeek provider 骨架；并并行建立轻量 UI tokens，不做全局重设计。
-原因：后端 provider 骨架能提前建立安全边界，UI tokens 能避免后续样式分散，同时都不会过早改动核心业务流程。
-建议改动范围
-创建后端环境变量读取方式，例如 DEEPSEEK_API_KEY。
-定义统一 AI provider interface，预留 mock/deepseek/future providers。
-定义 task draft 输出结构，避免前端直接依赖模型原始响应。
-提供最小 curl/manual test，先不强行接入完整 UI。
-建立 theme tokens、GlassCard、MotionListItem，但只在一个页面试点。
-DeepSeek/Claude Code 执行前必须遵守的 refactor gate
-先 inspect 相关文件，不要直接改。
-把任务分类为 patch / increment / refactor-first / rewrite-module。
-提出最小安全计划。
-只实现批准范围，不创建 V2/New 临时重复组件。
-最后报告 changed files、每个文件职责、测试命令和剩余风险。
-10. 风险与应对
-风险
-应对
-过早做 OCR/权限/同步导致复杂度爆炸
-先完成本地闭环和 review cards
-AI 误识别任务或时间
-默认生成草稿，不直接创建正式任务
-隐私争议：自动读取其他应用
-用户主动分享/上传/授权优先
-移动端泄露 API key
-所有模型请求通过后端 provider
-组件继续膨胀
-中等改动前执行 refactor gate
-Expo 环境问题
-优先 npx expo-doctor、npx tsc --noEmit、npx expo start -c 排查
-玻璃拟态影响可读性
-默认使用高不透明度 glass，Today/Plan 减少 blur，优先文字清晰
-动画拖慢效率或造成疲劳
-动画只解释状态变化，时长控制在 160-360ms，并尊重 Reduce Motion
+---
 
-11. 当前整理出的 Skills
-todo-pro-dev-copilot：用于 Todo Pro 产品和工程开发，回答下一步、架构、调试、实现路径等问题。
-todo-pro-claude-code-advisor：用于把任务转成 Claude Code/DeepSeek 可执行提示词，并评审输出。
-todo-pro-architecture-governor：用于判断该不该做、如何控制 MVP 边界、如何定义模块边界和技术风险。
-todo-pro-implementation-brief：用于把开发目标转成可直接发给 DeepSeek 的执行 brief。
-todo-pro-code-review-gate：用于审查 DeepSeek 的实现报告、diff、测试和剩余风险。
-建议后续所有重要开发任务都经过 architecture governor -> implementation brief -> code review gate 三步。
-12. 给 DeepSeek 的 UI 底座建议提示词
-下面这段可以直接发给 DeepSeek：
-Project context:Todo Pro is an Expo + React Native + TypeScript AI task inbox. It should feel native to Apple's macOS/iOS 26 Liquid Glass direction, but must remain highly readable and calm because it is a productivity app.Current task:Create the first version of Todo Pro's design system tokens and reusable glass UI primitives. Do not redesign every screen yet.Before changing files:1. Inspect current component and theme structure.2. Classify this task as increment.3. Propose the smallest safe plan.Scope:- Add theme tokens for spacing, radius, opacity, shadows, and motion duration.- Add or refactor a reusable GlassCard component.- Add a MotionListItem wrapper for simple fade/translate entrance animation.- Use glass effects only where supported and keep fallback styles readable.- Apply the components to one existing screen only, preferably Inbox or the current main task list.Design direction:- Calm Glass Productivity UI.- Light Liquid Glass influence.- Rounded, layered, translucent, but readable.- Animation should explain state changes, not decorate screens.Requirements:- Use Expo-compatible libraries only.- Prefer expo-blur if already available or easy to add.- Avoid global redesign.- Avoid heavy animations.- Avoid unreadable transparency.- Respect Reduce Motion if the project already has accessibility handling; otherwise leave a TODO.- Do not add OCR, AI provider changes, sync integrations, or external app APIs in this task.Acceptance criteria:- There is a central token file for radius, spacing, opacity, shadows, and motion.- There is a reusable GlassCard component.- There is a reusable MotionListItem or equivalent.- At least one existing list/card UI uses the new primitives.- Existing behavior remains unchanged.- TypeScript passes.Report after implementation:- Changed files- New components and responsibilities- Any added dependencies- Test commands run- Remaining UI/accessibility risks
-13. 长期记忆摘要
-Todo Pro 的长期项目背景：基于 Expo + React Native + TypeScript 的多来源 AI 任务收件箱。先做本地任务闭环，再做 AI/OCR/同步；AI 输出必须是可审核任务草稿；移动端不得存放模型 API key；外部 App 先通过用户主动分享/粘贴/上传进入，后续再考虑 OAuth 和同步写回；UI 方向为 Calm Glass Productivity UI，适配 macOS/iOS 26 的克制版 Liquid Glass。
-附录：给 DeepSeek/Claude Code 的下一条后端建议提示词
-下面这段可以直接发给 DeepSeek/Claude Code：
-Project context:We are building Todo Pro, an Expo + React Native + TypeScript app. It is an AI task inbox that turns user-shared content into reviewable task drafts. Local task loop comes first. Mobile must never contain model API keys.Current task:Create the smallest backend environment-variable and DeepSeek provider skeleton. Do not connect it deeply to UI yet.Before changing files:1. Inspect relevant files.2. Classify this task as patch, increment, refactor-first, or rewrite-module.3. Propose the smallest safe plan.Constraints:- Use environment variables for DeepSeek API key.- Add a provider interface that can support mock, DeepSeek, and future providers.- Return structured task draft objects.- Do not create V2/New duplicate components.- Preserve existing app behavior.After implementation, report changed files, responsibilities, commands/tests run, and remaining risks.
+## 4. 当前技术栈与开发方式
+
+| 模块 | 当前选择 |
+|---|---|
+| App | Expo + React Native + TypeScript |
+| 路由 | Expo Router |
+| 本地存储 | AsyncStorage 优先；任务量和查询复杂后再升级 SQLite |
+| 日期处理 | `clientTimeParser.ts`（NLP 中文时间解析，245 行）+ `dayjs` |
+| AI 接入 | 后端 API provider 层（mock / DeepSeek），移动端不放 key |
+| UI/动画 | Liquid Glass 主题系统（4 个预设 + 自定义主题编辑器） |
+| OCR | macOS `ocr-claw` 脚本 + 后端 OCR.Space provider |
+| 同步 | Firebase / Todoist / Calendar / Reminders 数据结构已就绪 |
+| 协作方式 | Claude Code 负责本地代码执行 |
+
+---
+
+## 5. 已完成进度
+
+### 5.1 基础架构（MVP 已完成）
+
+| 阶段 | 状态 |
+|---|---|
+| 本地任务闭环：新增、展示、编辑、完成/删除 | ✅ 完成 |
+| 任务分组：Inbox / Today / Overdue / Planned / Completed | ✅ 完成 |
+| Mock AI 提取：模拟从文本提取任务草稿 | ✅ 完成 |
+| 确认卡片：用户确认、编辑、拒绝 AI 草稿 | ✅ 完成 |
+| 后端 AI provider: DeepSeek + mock 双模式 | ✅ 完成 |
+| 中文时间 NLP 解析（`clientTimeParser.ts`, 245 行） | ✅ 完成 |
+| 来源追溯：Source → Draft → Review → Task 全链路 | ✅ 完成 |
+| 分享入口：从系统 share sheet 接收文字和图片 | ✅ 完成 |
+| OCR 识别：后端 OCR.Space + macOS 截图工具 | ✅ 完成 |
+| 外部同步框架：Todoist / Calendar / Reminders 数据结构测试 | ✅ 完成 |
+| Liquid Glass 主题引擎 + 4 个预设 + 自定义编辑器 | ✅ 完成 |
+| Cinema 级 GlassCard（7 层视觉效果） | ✅ 完成 |
+| 数据质量信任分（`localDataQuality.ts`） | ✅ 完成 |
+
+### 5.2 Phase 1 暴露已有能力（2026-05 ~ 2026-06）
+
+| 功能 | 状态 | 说明 |
+|---|---|---|
+| 死代码清理 | ✅ 完成 | 删除无引用的 `FloatingActionButton` |
+| useImageOCR 集成 | ✅ 完成 | OCR 扫描状态与 AI 提取状态分离显示 |
+| 搜索功能 | ✅ 完成 | 按标题/备注关键词过滤任务 |
+| 标签过滤 | ✅ 完成 | TaskFilterRail 支持按标签 chip 筛选 |
+| Inbox badge | ✅ 完成 | 顶部 Tab 栏显示待审核草稿数量 |
+| 审核卡片手势化 | ✅ 完成 | ReviewCard 支持左滑拒绝/右滑确认 |
+| 完成动画升级 | ✅ 完成 | 勾选 burst 粒子效果 + 全部完成庆祝 |
+| DraftCountContext | ✅ 完成 | 跨组件共享草稿计数的上下文 |
+
+**UI 部分（用户自行设计）**: 优先级选择器、标签输入、搜索框视觉——用户将自行设计交互样式。
+
+### 5.3 Phase 2 数据层 + domain 模块（2026-06）
+
+#### 数据模型扩展（`types/task.ts`）
+
+| 新字段 | 类型 | 用途 |
+|---|---|---|
+| `subtasks` | `SubTask[]` | 子任务列表 |
+| `recurrence` | `RecurrenceRule` | 重复规则 (daily/weekly/monthly/yearly) |
+| `estimatedMinutes` | `number` | 预计耗时 |
+| `actualMinutes` | `number` | 实际耗时 |
+| `completedAt` | `string` | 完成时间戳（用于统计） |
+| `xp` | `number` | 经验值（游戏化） |
+| `focusSessions` | `FocusSession[]` | 专注会话记录 |
+
+新增类型：`SubTask`, `RecurrenceRule`, `RecurrenceFrequency`, `FocusSession`
+
+#### 数据迁移 v2（`lib/migration.ts`）
+
+- `CURRENT_SCHEMA_VERSION` 升至 2
+- v2 迁移已注册，所有新字段均为 optional，旧数据向前兼容
+
+#### 新增 7 个 domain 模块（纯函数 + 测试）
+
+| 模块 | 功能 | 测试数 |
+|---|---|---|
+| `domain/productivityStats.ts` | 完成率、连续天数、每日趋势、来源分布、最产日 | 8 |
+| `domain/sourceEfficiency.ts` | 按来源类型分析完成率/逾期/平均耗时 | 3 |
+| `domain/achievements.ts` | 12 个成就定义 + 解锁检测逻辑 | 5 |
+| `domain/taskDecomposition.ts` | AI 任务拆解 prompt 构建 + 结果解析（JSON + 降级） | 4 |
+| `domain/recurrence.ts` | 从 RecurrenceRule 计算下次到期日 + 生成 N 次序列 | 8 |
+| `domain/xpLevel.ts` | 任务 XP 计算（base/high priority/on-time/source 加成）+ 等级公式 | 6 |
+| `domain/weeklyReport.ts` | 周报告聚合（完成数/高产日/来源/逾期/文字摘要） | 3 |
+
+#### 代码去重
+
+- `clientTimeParser.ts` 导出 `parseChineseNumber`, `normalizeHour`, `parseTimeOfDay` 等 6 个共用函数
+- `mockExtractor.ts` 移除约 70 行重复代码，改为引用 `clientTimeParser`
+- 三处中文时间解析的去重：前端 `clientTimeParser.ts` 与 `mockExtractor.ts` 统一；后端 `parseChineseTime.ts` 待处理
+
+### 5.4 macOS 截图工具（mac-tools/ocr-claw）
+
+| 功能 | 状态 |
+|---|---|
+| 三模式截图：全屏/区域/窗口 | ✅ 完成 |
+| 已有图片输入 | ✅ 完成 |
+| 仅本地识别模式（`--no-sync`） | ✅ 完成 |
+| Firestore 同步 | ✅ 完成 |
+| macOS 系统通知 | ✅ 完成 |
+| 截图后自动删除临时文件 | ✅ 完成 |
+| 权限错误友好提示 | ✅ 完成 |
+| **全局快捷键（Cmd+Shift+O）** | ❌ 未完成——Shortcuts 的 `screencapture` 权限问题尚未解决 |
+
+快捷键方案：通过 macOS Shortcuts App → Take Screenshot → Run Shell Script 调用 `ocr-claw.sh`，但 Shortcuts 沙箱环境与 `screencapture` 权限冲突，存在阻塞。
+
+---
+
+## 6. 当前技术债务
+
+| 项目 | 优先级 | 说明 |
+|---|---|---|
+| Shortcuts 权限 | 高 | `screencapture` 在 Shortcuts shell 中无法访问屏幕 |
+| 中文时间解析去重（后端） | 中 | `backend/src/time/parseChineseTime.ts` 仍独立维护 |
+| 单元测试覆盖率 | 中 | 新 domain 模块测试通过，但 UI 组件测试尚未建立 |
+| AsyncStorage → SQLite | 低 | 长期考虑，目前 AsyncStorage 仍够用 |
+
+---
+
+## 7. 推荐后续开发方向
+
+### Phase 3: AI 规划 + 沉浸体验
+
+| 功能 | 依赖 | 建议优先级 |
+|---|---|---|
+| AI 每日规划（增强 taskBriefing + DeepSeek API） | 后端规划 API | 高 |
+| 专注模式 + 番茄钟状态机 | `FocusSession` 类型已就绪 | 高 |
+| XP/等级 UI 显示 | 用户设计 UI | 中 |
+| 成就解锁反馈 | `achievements.ts` 已就绪 | 中 |
+| 每周回顾报告 | `weeklyReport.ts` 已就绪 | 中 |
+| macOS 快捷键修复 | 需研究替代方案（如 Hammerspoon） | 中 |
+| "现在该做什么"模式 | taskBriefing focus scoring 增强 | 中 |
+
+### Phase 4: 生态扩展
+
+| 功能 | 依赖 | 建议优先级 |
+|---|---|---|
+| 微信截图提取优化 | 现有 OCR 流程 | 低 |
+| 语音输入 | 需 macOS/iOS 语音 API | 低 |
+| 日历/周视图 | 用户设计 UI | 低 |
+| 多语言支持 | i18n 框架 | 低 |
+
+---
+
+## 8. 测试状态
+
+```
+现有 19 项测试: Calendar(7) + clientTimeParser(11) + backenAPI(2) + intake(7) + 
+  dataExport(5) + dataQuality(10) + manualInput(8) + mockExtractor(6) + 
+  reminders(2) + sourceTimeline(11) + syncPreflight(2) + syncRecord(5) + 
+  taskBriefing(4) + taskDuplicates(4) + taskExport(2) + taskDrafts(5) + 
+  taskGrouping(4) + tasks(11) + todoistExport(2) = 全部通过
+
+新增 7 项测试: productivityStats(8) + sourceEfficiency(3) + 
+  achievements(5) + taskDecomposition(4) + recurrence(8) + xpLevel(6) + 
+  weeklyReport(3) = 全部通过
+
+TypeScript 编译: npx tsc --noEmit 零错误
+```
+
+---
+
+## 9. 风险与应对
+
+| 风险 | 应对 |
+|---|---|
+| 过早做 OCR/权限/同步导致复杂度爆炸 | 先完成本地闭环和 review cards |
+| AI 误识别任务或时间 | 默认生成草稿，不直接创建正式任务 |
+| 隐私争议：自动读取其他应用 | 用户主动分享/上传/授权优先 |
+| 移动端泄露 API key | 所有模型请求通过后端 provider |
+| 组件继续膨胀 | 中等改动前执行 refactor gate |
+| Expo 环境问题 | 优先 `npx expo-doctor`、`npx tsc --noEmit` 排查 |
+| 玻璃拟态影响可读性 | 默认高不透明度 glass，优先文字清晰 |
+| 动画拖慢效率 | 动画只解释状态变化，时长 160-360ms，尊重 Reduce Motion |
+| **Shortcuts sandbox 权限** | 替代方案：Hammerspoon / Raycast / Alfred 调用 |
+
+---
+
+## 附录 A: 领域层模块总览
+
+截止 2026-06-01，domain 层共有 **22 个模块**：
+
+```
+✅ 原有（15）:
+calendarExport.ts        localDataExport.ts        remindersExport.ts
+intake.ts                localDataQuality.ts       sourceTimeline.ts
+syncPreflight.ts         syncRecords.ts            taskBriefing.ts
+taskDrafts.ts            taskDuplicates.ts         taskExport.ts
+taskGrouping.ts          tasks.ts                  todoistExport.ts
+
+✅ 新增（7）:
+productivityStats.ts     sourceEfficiency.ts       achievements.ts
+taskDecomposition.ts     recurrence.ts             xpLevel.ts
+weeklyReport.ts
+```
+
+---
+
+## 附录 B: macOS ocr-claw 使用说明
+
+```bash
+# 一键截图（默认全屏）
+./mac-tools/ocr-claw.sh
+
+# 区域选择
+./mac-tools/ocr-claw.sh -i
+
+# 窗口选择
+./mac-tools/ocr-claw.sh -w
+
+# 使用已有图片
+./mac-tools/ocr-claw.sh -p screenshot.png
+
+# 仅本地识别（不同步 Firebase）
+./mac-tools/ocr-claw.sh --no-sync
+```

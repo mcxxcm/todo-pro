@@ -19,19 +19,19 @@ export const SYNC_TARGETS: SyncTarget[] = [
   {
     provider: "reminders",
     label: "Apple Reminders",
-    status: "planned",
-    description: "后续通过用户授权写入，不默认后台读取。",
+    status: "active",
+    description: "iOS 上可授权写入提醒事项，不默认后台读取。",
   },
   {
     provider: "calendar",
     label: "Calendar",
-    status: "planned",
-    description: "适合有明确日期的任务，需处理冲突和撤回。",
+    status: "active",
+    description: "可授权写入日历事件，仅同步已确认日期的任务。",
   },
   {
     provider: "todoist",
     label: "Todoist",
     status: "active",
-    description: "支持模拟同步，输入 Token 可直接真实写入您的 Todoist 收件箱。",
+    description: "Personal API Token 同步。OAuth 授权在 Phase 3 计划中，当前需手动填入 Token。",
   },
 ];

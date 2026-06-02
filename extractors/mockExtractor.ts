@@ -1,14 +1,15 @@
 import { Extractor } from "./types";
 import { ExtractedTask, ExtractionResult } from "@/types/extraction";
 import { TaskPriority } from "@/types/task";
+import {
+  WEEKDAY_NAMES,
+  CN_DIGITS,
+  CN_NUMBER_PATTERN,
+  parseChineseNumber,
+  normalizeHour,
+  parseTimeOfDay,
+} from "@/lib/clientTimeParser";
 
-const WEEKDAY_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
-const CN_DIGITS: Record<string, number> = {
-  零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5,
-  六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
-  廿: 20,
-};
-const CN_NUMBER_PATTERN = "[零〇一二两三四五六七八九十廿]+";
 const SOURCE_HEADER_PATTERN =
   /^(subject|from|to|date|cc|bcc|发件人|收件人|抄送|主题|日期)\s*[:：]/i;
 const URL_ONLY_PATTERN = /^https?:\/\/\S+$/i;
@@ -16,63 +17,10 @@ const ACTION_HINT_PATTERN = /[会要去到做买看找取送交联系确认提�
 
 // -- Helpers -----------------------------------------------------------------
 
-function parseChineseNumber(s: string): number | null {
-  if (s in CN_DIGITS) return CN_DIGITS[s];
-  const normalized = s.replace(/两/g, "二");
-  const tens = normalized.match(/^十([一二三四五六七八九])?$/);
-  if (tens) return 10 + (tens[1] ? CN_DIGITS[tens[1]] : 0);
-  const twenties = normalized.match(/^二十([一二三四五六七八九])?$/);
-  if (twenties) return 20 + (twenties[1] ? CN_DIGITS[twenties[1]] : 0);
-  const thirties = normalized.match(/^三十([一二三四五六七八九])?$/);
-  if (thirties) return 30 + (thirties[1] ? CN_DIGITS[thirties[1]] : 0);
-  return null;
-}
-
-function parseHourValue(value: string): number | null {
-  if (/^\d{1,2}$/.test(value)) return parseInt(value, 10);
-  return parseChineseNumber(value);
-}
-
-function normalizeHour(hour: number, text: string): number {
-  if (/凌晨/.test(text)) return hour === 12 ? 0 : hour;
-  if (/中午/.test(text)) return hour < 11 ? hour + 12 : hour;
-  if (/下午|晚上|傍晚|今晚|明晚/.test(text) && hour < 12) return hour + 12;
-  return hour;
-}
-
 function extractTimeFromText(
   text: string
 ): { hour: number; minute: number } | null {
-  const timeMatch = text.match(
-    /(?:凌晨|下午|晚上|傍晚|上午|早上|中午)?\s*(\d{1,2})\s*[：:](\d{2})/
-  );
-  if (timeMatch) {
-    let h = normalizeHour(parseInt(timeMatch[1]), text);
-    const m = parseInt(timeMatch[2]);
-    return { hour: h, minute: m };
-  }
-  const hourMatch = text.match(
-    new RegExp(
-      `(?:凌晨|下午|晚上|傍晚|上午|早上|中午|今晚|明早|明晚)?\\s*(\\d{1,2}|${CN_NUMBER_PATTERN})\\s*点\\s*(半|一刻|三刻|\\d{1,2}|${CN_NUMBER_PATTERN})?`
-    )
-  );
-  if (hourMatch) {
-    const parsedHour = parseHourValue(hourMatch[1]);
-    if (parsedHour === null || parsedHour > 24) return null;
-
-    const minuteText = hourMatch[2];
-    let minute = 0;
-    if (minuteText === "半") minute = 30;
-    else if (minuteText === "一刻") minute = 15;
-    else if (minuteText === "三刻") minute = 45;
-    else if (minuteText) {
-      const parsedMinute = parseHourValue(minuteText);
-      minute = parsedMinute === null ? 0 : Math.max(0, Math.min(59, parsedMinute));
-    }
-
-    return { hour: normalizeHour(parsedHour, text), minute };
-  }
-  return null;
+  return parseTimeOfDay(text);
 }
 
 // -- Date parsing -----------------------------------------------------------

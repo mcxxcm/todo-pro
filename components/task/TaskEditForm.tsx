@@ -1,17 +1,27 @@
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { useState } from "react";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import { GlassButton } from "@/components/ui/GlassButton";
+import { PriorityPicker } from "@/components/task/PriorityPicker";
+import { DatePickerModal } from "@/components/task/DatePickerModal";
+import { TagInput } from "@/components/task/TagInput";
 import { Colors } from "@/constants/theme";
 import { Glass, Radius, Spacing } from "@/constants/tokens";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import type { TaskPriority } from "@/types/task";
 
 export function TaskEditForm({
   draftDueText,
   draftNotes,
+  draftPriority,
+  draftTags,
   draftTitle,
   onCancel,
   onChangeDueText,
   onChangeNotes,
+  onChangePriority,
+  onChangeTags,
   onChangeTitle,
   onSave,
   saving,
@@ -19,10 +29,14 @@ export function TaskEditForm({
 }: {
   draftDueText: string;
   draftNotes: string;
+  draftPriority: TaskPriority;
+  draftTags: string[];
   draftTitle: string;
   onCancel: () => void;
   onChangeDueText: (value: string) => void;
   onChangeNotes: (value: string) => void;
+  onChangePriority: (value: TaskPriority) => void;
+  onChangeTags: (value: string[]) => void;
   onChangeTitle: (value: string) => void;
   onSave: () => void;
   saving: boolean;
@@ -31,6 +45,7 @@ export function TaskEditForm({
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
   const colors = Colors[colorScheme];
   const inputBackground = Glass.inputBackground[colorScheme];
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
 
   return (
     <View style={styles.editContainer}>
@@ -56,22 +71,42 @@ export function TaskEditForm({
       </View>
 
       <View style={styles.editField}>
+        <Text style={[styles.editLabel, { color: colors.tint }]}>优先级</Text>
+        <PriorityPicker value={draftPriority} onChange={onChangePriority} />
+      </View>
+
+      <View style={styles.editField}>
         <Text style={[styles.editLabel, { color: colors.tint }]}>时间</Text>
-        <TextInput
-          value={draftDueText}
-          onChangeText={onChangeDueText}
-          placeholder="例如：明天下午三点"
-          placeholderTextColor={colors.icon}
-          accessibilityLabel="任务时间"
-          style={[
-            styles.editInput,
-            {
-              backgroundColor: inputBackground,
-              borderColor: colors.icon,
-              color: colors.text,
-            },
-          ]}
-        />
+        <View style={styles.timeInputRow}>
+          <TextInput
+            value={draftDueText}
+            onChangeText={onChangeDueText}
+            placeholder="例如：明天下午三点"
+            placeholderTextColor={colors.icon}
+            accessibilityLabel="任务时间"
+            style={[
+              styles.editInput,
+              styles.timeInput,
+              {
+                backgroundColor: inputBackground,
+                borderColor: colors.icon,
+                color: colors.text,
+              },
+            ]}
+          />
+          <TouchableOpacity
+            onPress={() => setDatePickerVisible(true)}
+            style={[styles.calendarBtn, { borderColor: colors.icon, backgroundColor: inputBackground }]}
+            accessibilityLabel="选择日期"
+          >
+            <MaterialIcons name="calendar-today" size={14} color={colors.tint} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.editField}>
+        <Text style={[styles.editLabel, { color: colors.tint }]}>标签</Text>
+        <TagInput tags={draftTags} onChange={onChangeTags} />
       </View>
 
       <View style={styles.editField}>
@@ -130,6 +165,19 @@ export function TaskEditForm({
           </Text>
         </GlassButton>
       </View>
+
+      <DatePickerModal
+        visible={datePickerVisible}
+        onClose={() => setDatePickerVisible(false)}
+        onSelect={(iso, display) => {
+          if (iso) {
+            onChangeDueText(display);
+          } else {
+            onChangeDueText("");
+          }
+        }}
+        initialDate={draftDueText ? undefined : undefined}
+      />
     </View>
   );
 }
@@ -165,6 +213,21 @@ const styles = StyleSheet.create({
     minHeight: 40,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
+  },
+  timeInputRow: {
+    flexDirection: "row",
+    gap: Spacing.xs,
+  },
+  timeInput: {
+    flex: 1,
+  },
+  calendarBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
   },
   editLabel: {
     fontSize: 12,

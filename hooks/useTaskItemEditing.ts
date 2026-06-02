@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { parseClientDateInfo } from "@/lib/clientTimeParser";
-import type { NormalizedTask, TaskUpdateInput } from "@/types/task";
+import type { NormalizedTask, TaskPriority, TaskUpdateInput } from "@/types/task";
 
 export function useTaskItemEditing({
   onUpdate,
@@ -15,6 +15,8 @@ export function useTaskItemEditing({
   const [draftTitle, setDraftTitle] = useState(task.title);
   const [draftDueText, setDraftDueText] = useState(task.dueText ?? "");
   const [draftNotes, setDraftNotes] = useState(task.notes ?? "");
+  const [draftPriority, setDraftPriority] = useState<TaskPriority>(task.priority ?? "none");
+  const [draftTags, setDraftTags] = useState<string[]>(task.tags ?? []);
 
   const saveDisabled = saving || !draftTitle.trim();
 
@@ -22,6 +24,8 @@ export function useTaskItemEditing({
     setDraftTitle(task.title);
     setDraftDueText(task.dueText ?? "");
     setDraftNotes(task.notes ?? "");
+    setDraftPriority(task.priority ?? "none");
+    setDraftTags(task.tags ?? []);
   };
 
   useEffect(() => {
@@ -29,8 +33,10 @@ export function useTaskItemEditing({
       setDraftTitle(task.title);
       setDraftDueText(task.dueText ?? "");
       setDraftNotes(task.notes ?? "");
+      setDraftPriority(task.priority ?? "none");
+      setDraftTags(task.tags ?? []);
     }
-  }, [editing, task.dueText, task.id, task.notes, task.title]);
+  }, [editing, task.dueText, task.id, task.notes, task.priority, task.tags, task.title]);
 
   const startEditing = () => {
     resetDrafts();
@@ -69,6 +75,8 @@ export function useTaskItemEditing({
             : task.timeStatus ?? "confirmed"
           : "none",
         notes: draftNotes.trim() || undefined,
+        priority: draftPriority !== "none" ? draftPriority : undefined,
+        tags: draftTags.length > 0 ? draftTags : undefined,
       });
       setEditing(false);
     } finally {
@@ -80,6 +88,8 @@ export function useTaskItemEditing({
     cancelEditing,
     draftDueText,
     draftNotes,
+    draftPriority,
+    draftTags,
     draftTitle,
     editing,
     saveDisabled,
@@ -87,6 +97,8 @@ export function useTaskItemEditing({
     saving,
     setDraftDueText,
     setDraftNotes,
+    setDraftPriority,
+    setDraftTags,
     setDraftTitle,
     startEditing,
   };

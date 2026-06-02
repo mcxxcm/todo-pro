@@ -15,7 +15,7 @@ interface ReviewModalContentProps {
   onConfirm: (task: ExtractedTask & Partial<Pick<TaskDraft, "sourceId" | "sourceType">>) => void;
   onConfirmAll: () => void;
   onDismiss: (taskId: string) => void;
-  onFieldChange: (taskId: string, field: "title" | "dueText" | "dueAt" | "timeStatus", value: string | undefined) => void;
+  onFieldChange: (taskId: string, field: "title" | "dueText" | "dueAt" | "timeStatus" | "tags", value: string | string[] | undefined) => void;
   pendingSave: boolean;
 }
 
@@ -66,6 +66,8 @@ export function ReviewModalContent({
           <TouchableOpacity
             onPress={onClose}
             activeOpacity={0.7}
+            accessibilityLabel="关闭审核面板"
+            accessibilityRole="button"
           >
             <ThemedText style={styles.modalClose}>关闭</ThemedText>
           </TouchableOpacity>
@@ -101,6 +103,9 @@ export function ReviewModalContent({
               onPress={onConfirmAll}
               disabled={pendingSave}
               activeOpacity={0.7}
+              accessibilityLabel={`全部保存 ${candidates.length} 个草稿`}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: pendingSave }}
             >
               <Text style={styles.confirmAllText}>
                 {pendingSave ? "保存中..." : `全部保存 (${candidates.length})`}

@@ -10,6 +10,31 @@ export type TaskProvider = "local" | "todoist" | "reminders" | "calendar";
 
 export type TimeStatus = "none" | "needs_review" | "confirmed";
 
+export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
+
+export interface RecurrenceRule {
+  frequency: RecurrenceFrequency;
+  interval: number;
+  endDate?: string;
+  count?: number;
+  daysOfWeek?: number[];
+}
+
+export interface SubTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  estimatedMinutes?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FocusSession {
+  startedAt: string;
+  endedAt?: string;
+  durationMinutes: number;
+}
+
 export interface NormalizedTask {
   id: string;
   title: string;
@@ -31,6 +56,14 @@ export interface NormalizedTask {
   updatedAt: string;
   provider: TaskProvider;
   externalId?: string;
+  // v2新增字段
+  subtasks?: SubTask[];
+  recurrence?: RecurrenceRule;
+  estimatedMinutes?: number;
+  actualMinutes?: number;
+  completedAt?: string;
+  xp?: number;
+  focusSessions?: FocusSession[];
 }
 
 export type TaskUpdateInput = Partial<
@@ -50,4 +83,12 @@ export type TaskUpdateInput = Partial<
     | "tags"
     | "status"
   >
->;
+> & {
+  subtasks?: SubTask[];
+  recurrence?: RecurrenceRule;
+  estimatedMinutes?: number;
+  actualMinutes?: number;
+  completedAt?: string;
+  xp?: number;
+  focusSessions?: FocusSession[];
+};

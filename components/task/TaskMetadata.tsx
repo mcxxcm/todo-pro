@@ -71,6 +71,25 @@ export function TaskMetadata({
           </Text>
         </View>
       )}
+      {task.subtasks && task.subtasks.length > 0 && (
+        <View style={styles.subtaskProgressChip}>
+          <MaterialIcons
+            name="checklist"
+            size={12}
+            color={task.subtasks.filter((st) => st.status === "done").length === task.subtasks.length ? StatusColors.success : colors.icon}
+          />
+          <Text
+            style={[
+              styles.subtaskProgressText,
+              {
+                color: task.subtasks.filter((st) => st.status === "done").length === task.subtasks.length ? StatusColors.success : colors.icon,
+              },
+            ]}
+          >
+            {task.subtasks.filter((st) => st.status === "done").length}/{task.subtasks.length}
+          </Text>
+        </View>
+      )}
       <View style={styles.sourceChip}>
         <MaterialIcons
           name={task.sourceType === "image" ? "image" : task.sourceId ? "verified" : "edit-note"}
@@ -128,6 +147,17 @@ const styles = StyleSheet.create({
   sourceChipText: {
     fontSize: 10,
     fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  subtaskProgressChip: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 2,
+  },
+  subtaskProgressText: {
+    fontSize: 10,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
     letterSpacing: 0.6,
   },
   taskDue: {

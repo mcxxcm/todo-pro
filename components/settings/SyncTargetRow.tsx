@@ -132,7 +132,7 @@ export function SyncTargetRow({
         {target.provider === "todoist" && (
           <View style={styles.tokenContainer}>
             <Text style={[styles.tokenLabel, { color: colors.tint }]}>
-              Todoist API Token
+              Todoist API Token (Personal · OAuth 计划中)
             </Text>
             <TextInput
               style={[

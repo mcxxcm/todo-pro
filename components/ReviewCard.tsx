@@ -7,12 +7,21 @@ import {
   View,
   TextInput,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+} from "react-native-reanimated";
 import { ExtractedTask } from "@/types/extraction";
 import { TaskDraftStatus } from "@/types/draft";
 import type { SourceItemType } from "@/types/source";
 import { TimeStatus } from "@/types/task";
 import { ThemedText } from "@/components/themed-text";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { TagInput } from "@/components/task/TagInput";
 import { Colors } from "@/constants/theme";
 import { Glass, Opacity, Radius, Spacing, StatusColors } from "@/constants/tokens";
 import { getShortSourceTypeLabel } from "@/domain/sourceTimeline";
@@ -28,8 +37,8 @@ interface ReviewCardProps {
   onDismiss: (taskId: string) => void;
   onFieldChange?: (
     id: string,
-    field: "title" | "dueText" | "dueAt" | "timeStatus",
-    value: string | undefined,
+    field: "title" | "dueText" | "dueAt" | "timeStatus" | "tags",
+    value: string | string[] | undefined,
   ) => void;
 }
 
@@ -44,6 +53,7 @@ export function ReviewCard({
 
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDueText, setEditDueText] = useState(task.dueText ?? "");
+  const [editTags, setEditTags] = useState<string[]>(task.tags ?? []);
   const [editTimeStatus, setEditTimeStatus] = useState<TimeStatus>(
     task.timeStatus ?? (task.dueText ? "needs_review" : "none"),
   );
@@ -52,8 +62,9 @@ export function ReviewCard({
   useEffect(() => {
     setEditTitle(task.title);
     setEditDueText(task.dueText ?? "");
+    setEditTags(task.tags ?? []);
     setEditTimeStatus(task.timeStatus ?? (task.dueText ? "needs_review" : "none"));
-  }, [task.id, task.title, task.dueText, task.timeStatus]);
+  }, [task.id, task.title, task.dueText, task.tags, task.timeStatus]);
 
   const titleEmpty = !editTitle.trim();
   const hasDueText = !!editDueText.trim();
@@ -80,6 +91,47 @@ export function ReviewCard({
     onFieldChange?.(task.id, "timeStatus", "confirmed");
   };
 
+  const SWIPE_THRESHOLD = 100;
+  const translateX = useSharedValue(0);
+  const isSwiping = useSharedValue(false);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .onBegin(() => {
+      isSwiping.value = true;
+    })
+    .onUpdate((e) => {
+      translateX.value = e.translationX;
+    })
+    .onEnd((e) => {
+      isSwiping.value = false;
+      if (e.translationX > SWIPE_THRESHOLD) {
+        translateX.value = withTiming(600, { duration: 200 }, () => {
+          runOnJS(handleConfirm)();
+          translateX.value = 0;
+        });
+      } else if (e.translationX < -SWIPE_THRESHOLD) {
+        translateX.value = withTiming(-600, { duration: 200 }, () => {
+          runOnJS(onDismiss)(task.id);
+          translateX.value = 0;
+        });
+      } else {
+        translateX.value = withSpring(0, { damping: 15, stiffness: 200 });
+      }
+    });
+
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const acceptOverlayStyle = useAnimatedStyle(() => ({
+    opacity: translateX.value > 0 ? Math.min(translateX.value / SWIPE_THRESHOLD, 1) : 0,
+  }));
+
+  const rejectOverlayStyle = useAnimatedStyle(() => ({
+    opacity: translateX.value < 0 ? Math.min(-translateX.value / SWIPE_THRESHOLD, 1) : 0,
+  }));
+
   const handleConfirm = () => {
     const dueText = editDueText.trim() || undefined;
     const dueTextChanged = dueText !== task.dueText;
@@ -97,6 +149,7 @@ export function ReviewCard({
           : task.dueAt
         : undefined,
       timeStatus: dueText ? editTimeStatus : "none",
+      tags: editTags,
     });
   };
 
@@ -108,6 +161,17 @@ export function ReviewCard({
   const sourceTypeLabel = getShortSourceTypeLabel(task.sourceType);
 
   return (
+    <View style={styles.swipeContainer}>
+      <Animated.View style={[styles.swipeOverlay, styles.acceptOverlay, acceptOverlayStyle]}>
+        <MaterialIcons name="check" size={28} color="#fff" />
+        <Text style={styles.swipeOverlayText}>确认</Text>
+      </Animated.View>
+      <Animated.View style={[styles.swipeOverlay, styles.rejectOverlay, rejectOverlayStyle]}>
+        <MaterialIcons name="close" size={28} color="#fff" />
+        <Text style={styles.swipeOverlayText}>忽略</Text>
+      </Animated.View>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={animatedCardStyle}>
     <GlassCard
       style={styles.card}
       accessibilityRole="summary"
@@ -248,6 +312,10 @@ export function ReviewCard({
         </View>
       )}
 
+      <View style={styles.tagsRow}>
+        <TagInput tags={editTags} onChange={(newTags) => { setEditTags(newTags); onFieldChange?.(task.id, "tags", newTags); }} />
+      </View>
+
       {task.notes ? (
         <ThemedText style={styles.notesText} numberOfLines={3}>
           {task.notes}
@@ -295,13 +363,42 @@ export function ReviewCard({
         </TouchableOpacity>
       </View>
     </GlassCard>
+        </Animated.View>
+      </GestureDetector>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  swipeContainer: {
+    position: "relative",
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.card,
+    overflow: "hidden",
+  },
+  swipeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: Radius.card,
+    zIndex: 1,
+    flexDirection: "row",
+    gap: Spacing.xs,
+  },
+  acceptOverlay: {
+    backgroundColor: "rgba(52, 199, 89, 0.85)",
+  },
+  rejectOverlay: {
+    backgroundColor: "rgba(255, 59, 48, 0.85)",
+  },
+  swipeOverlayText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
   card: {
     borderRadius: Radius.card,
-    marginBottom: Spacing.sm,
+    marginBottom: 0,
   },
   cardHeader: {
     alignItems: "center",
@@ -392,6 +489,9 @@ const styles = StyleSheet.create({
     opacity: Opacity.muted,
     marginBottom: Spacing.sm,
     lineHeight: 18,
+  },
+  tagsRow: {
+    marginBottom: Spacing.sm,
   },
   timeReviewLabel: {
     fontSize: 12,

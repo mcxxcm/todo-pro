@@ -1,25 +1,24 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
+  FlatList,
   Platform,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
+import { SourceFilterBar, type SourceLibraryFilter } from "@/components/source/SourceFilterBar";
+import { SourceListItem } from "@/components/source/SourceListItem";
+import { SourceSummary } from "@/components/source/SourceSummary";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Colors } from "@/constants/theme";
 import { Glass, Opacity, Radius, Spacing } from "@/constants/tokens";
-import {
-  buildSourceTimeline,
-  getSourceTypeLabel,
-  type SourceTimelineItem,
-} from "@/domain/sourceTimeline";
+import { buildSourceTimeline, type SourceTimelineItem } from "@/domain/sourceTimeline";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { activeExtractor } from "@/extractors";
@@ -28,35 +27,6 @@ import { loadSources } from "@/lib/sourceStorage";
 import { loadTasks } from "@/lib/taskStorage";
 import { createLocalDrafts } from "@/providers/localDraftProvider";
 import { deleteOrphanLocalSources } from "@/providers/localSourceProvider";
-import type { SourceItemType } from "@/types/source";
-
-const SOURCE_ICONS: Record<SourceItemType, keyof typeof MaterialIcons.glyphMap> = {
-  email: "mail-outline",
-  image: "image",
-  link: "link",
-  manual: "edit-note",
-  pdf: "picture-as-pdf",
-  share: "ios-share",
-  text: "article",
-};
-
-type SourceLibraryFilter = "all" | "orphan" | SourceItemType;
-
-const SOURCE_FILTERS: {
-  id: SourceLibraryFilter;
-  label: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
-}[] = [
-  { id: "all", icon: "dashboard", label: "全部" },
-  { id: "orphan", icon: "auto-delete", label: "孤立" },
-  { id: "manual", icon: "edit-note", label: "手动" },
-  { id: "share", icon: "ios-share", label: "分享" },
-  { id: "image", icon: "image", label: "OCR" },
-  { id: "link", icon: "link", label: "链接" },
-  { id: "pdf", icon: "picture-as-pdf", label: "PDF" },
-  { id: "email", icon: "mail-outline", label: "邮件" },
-  { id: "text", icon: "article", label: "文本" },
-];
 
 export default function SourceLibraryScreen() {
   const router = useRouter();
@@ -89,11 +59,14 @@ export default function SourceLibraryScreen() {
     (item) => item.taskCount > 0 || item.draftCount > 0,
   ).length;
   const orphanCount = items.filter((item) => item.isOrphan).length;
-  const visibleItems = items.filter((item) => {
-    if (activeFilter === "all") return true;
-    if (activeFilter === "orphan") return item.isOrphan;
-    return item.type === activeFilter;
-  });
+
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => {
+      if (activeFilter === "all") return true;
+      if (activeFilter === "orphan") return item.isOrphan;
+      return item.type === activeFilter;
+    });
+  }, [items, activeFilter]);
 
   const handleExtractAgain = async (item: SourceTimelineItem) => {
     if (!item.preview.trim() || extractingSourceId) return;
@@ -190,248 +163,101 @@ export default function SourceLibraryScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <GlassCard style={styles.summaryCard}>
-          <View style={styles.summaryGrid}>
-            <Metric label="来源" value={items.length} />
-            <Metric label="已关联" value={sourceBackedCount} />
-            <Metric
-              label="孤立"
-              value={orphanCount}
+      <FlatList
+        data={visibleItems}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.listItemWrapper}>
+            <SourceListItem
+              item={item}
+              expanded={expandedId === item.id}
+              onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
+              onExtract={(it) => void handleExtractAgain(it)}
+              extracting={extractingSourceId === item.id}
             />
           </View>
-          <TouchableOpacity
-            activeOpacity={orphanCount > 0 ? 0.72 : 1}
-            accessibilityLabel="清理孤立来源"
-            disabled={orphanCount === 0 || cleaningOrphans}
-            onPress={() => void handleCleanOrphans()}
-            style={[
-              styles.cleanButton,
-              {
-                backgroundColor: Glass.inputBackground[colorScheme],
-                borderColor: Glass.border[colorScheme],
-                opacity: orphanCount === 0 ? Opacity.disabled : 1,
-              },
-            ]}
-          >
-            <MaterialIcons name="auto-delete" size={15} color={colors.tint} />
-            <Text style={[styles.cleanButtonText, { color: colors.tint }]}>
-              {cleaningOrphans ? "清理中..." : "清理孤立来源"}
-            </Text>
-          </TouchableOpacity>
-          {cleanupMessage && (
-            <Text style={[styles.cleanupMessage, { color: colors.icon }]}>
-              {cleanupMessage}
-            </Text>
-          )}
-        </GlassCard>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-        >
-          {SOURCE_FILTERS.map((filter) => {
-            const active = activeFilter === filter.id;
-            return (
-              <TouchableOpacity
-                key={filter.id}
-                activeOpacity={0.72}
-                accessibilityLabel={`筛选${filter.label}来源`}
-                accessibilityState={{ selected: active }}
-                onPress={() => setActiveFilter(filter.id)}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: active
-                      ? colorScheme === "dark"
-                        ? "rgba(255, 255, 255, 0.08)"
-                        : "rgba(255, 255, 255, 0.72)"
-                      : Glass.inputBackground[colorScheme],
-                    borderColor: active ? Glass.rim[colorScheme] : Glass.border[colorScheme],
-                  },
-                ]}
-              >
-                <MaterialIcons
-                  name={filter.icon}
-                  size={14}
-                  color={active ? colors.text : colors.icon}
-                />
-                <Text
-                  style={[
-                    styles.filterText,
-                    { color: active ? colors.text : colors.icon },
-                  ]}
-                >
-                  {filter.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {visibleItems.length === 0 ? (
-          <GlassCard style={styles.emptyCard} contentStyle={styles.emptyContent}>
-            <MaterialIcons name="article" size={28} color={colors.icon} />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              {items.length === 0 ? "还没有来源" : "当前筛选为空"}
-            </Text>
-            <Text style={[styles.emptyText, { color: colors.icon }]}>
-              {items.length === 0
-                ? "从首页输入、分享或上传图片后，来源会自动归档在这里。"
-                : "换一个来源类型，或者回到全部来源。"}
-            </Text>
-            {items.length > 0 && (
+        )}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <SourceSummary
+              totalCount={items.length}
+              backedCount={sourceBackedCount}
+              orphanCount={orphanCount}
+            />
+            {orphanCount > 0 && (
               <TouchableOpacity
                 activeOpacity={0.72}
-                accessibilityLabel="查看全部来源"
-                onPress={() => setActiveFilter("all")}
+                accessibilityLabel="清理孤立来源"
+                disabled={cleaningOrphans}
+                onPress={() => void handleCleanOrphans()}
                 style={[
-                  styles.showAllButton,
+                  styles.cleanButton,
                   {
                     backgroundColor: Glass.inputBackground[colorScheme],
                     borderColor: Glass.border[colorScheme],
+                    opacity: cleaningOrphans ? Opacity.disabled : 1,
                   },
                 ]}
               >
-                <Text style={[styles.showAllText, { color: colors.tint }]}>
-                  查看全部
+                <MaterialIcons name="auto-delete" size={15} color={colors.tint} />
+                <Text style={[styles.cleanButtonText, { color: colors.tint }]}>
+                  {cleaningOrphans ? "清理中..." : "清理孤立来源"}
                 </Text>
               </TouchableOpacity>
             )}
-          </GlassCard>
-        ) : (
-          <View style={styles.timeline}>
-            {visibleItems.map((item) => {
-              const expanded = expandedId === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  activeOpacity={0.76}
-                  accessibilityLabel={`查看来源：${item.title}`}
-                  onPress={() => setExpandedId(expanded ? null : item.id)}
-                >
-                  <GlassCard style={styles.sourceCard}>
-                    <View style={styles.sourceHeader}>
-                      <View
-                        style={[
-                          styles.sourceIcon,
-                          {
-                            backgroundColor: Glass.inputBackground[colorScheme],
-                            borderColor: Glass.border[colorScheme],
-                          },
-                        ]}
-                      >
-                        <MaterialIcons
-                          name={SOURCE_ICONS[item.type]}
-                          size={17}
-                          color={colors.icon}
-                        />
-                      </View>
-                      <View style={styles.sourceCopy}>
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.sourceTitle, { color: colors.text }]}
-                        >
-                          {item.title}
-                        </Text>
-                        <Text style={[styles.sourceMeta, { color: colors.icon }]}>
-                          {getSourceTypeLabel(item.type)} ·{" "}
-                          {new Date(item.createdAt).toLocaleString()}
-                        </Text>
-                      </View>
-                      <MaterialIcons
-                        name={expanded ? "expand-less" : "expand-more"}
-                        size={18}
-                        color={colors.icon}
-                      />
-                    </View>
-                    <View style={styles.badgeRow}>
-                      <Badge label="任务" value={item.taskCount} />
-                      <Badge label="草稿" value={item.draftCount} />
-                      {item.url && <Badge label="链接" value="有" />}
-                      {item.isOrphan && <Badge label="状态" value="孤立" />}
-                    </View>
-                    <Text
-                      numberOfLines={expanded ? undefined : 3}
-                      style={[styles.preview, { color: colors.icon }]}
-                    >
-                      {item.preview}
-                    </Text>
-                    {expanded && (
-                      <TouchableOpacity
-                        activeOpacity={0.72}
-                        accessibilityLabel={`从${item.title}重新提取任务`}
-                        disabled={extractingSourceId !== null}
-                        onPress={() => void handleExtractAgain(item)}
-                        style={[
-                          styles.extractButton,
-                          {
-                            backgroundColor: Glass.inputBackground[colorScheme],
-                            borderColor: Glass.border[colorScheme],
-                            opacity: extractingSourceId !== null ? Opacity.disabled : 1,
-                          },
-                        ]}
-                      >
-                        <MaterialIcons
-                          name="auto-awesome"
-                          size={15}
-                          color={colors.tint}
-                        />
-                        <Text style={[styles.extractButtonText, { color: colors.tint }]}>
-                          {extractingSourceId === item.id ? "提取中..." : "重新提取任务"}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </GlassCard>
-                </TouchableOpacity>
-              );
-            })}
+            {cleanupMessage && (
+              <Text style={[styles.cleanupMessage, { color: colors.icon }]}>
+                {cleanupMessage}
+              </Text>
+            )}
+            <SourceFilterBar activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+            {visibleItems.length > 0 && (
+              <Text style={[styles.resultCount, { color: colors.icon }]}>
+                {visibleItems.length} 条来源
+              </Text>
+            )}
           </View>
-        )}
-      </ScrollView>
+        }
+        ListEmptyComponent={
+          <GlassCard style={styles.emptyCard}>
+            <View style={styles.emptyContent}>
+              <MaterialIcons name="article" size={28} color={colors.icon} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                {items.length === 0 ? "还没有来源" : "当前筛选为空"}
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.icon }]}>
+                {items.length === 0
+                  ? "从首页输入、分享或上传图片后，来源会自动归档在这里。"
+                  : "换一个来源类型，或者回到全部来源。"}
+              </Text>
+              {items.length > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.72}
+                  accessibilityLabel="查看全部来源"
+                  onPress={() => setActiveFilter("all")}
+                  style={[
+                    styles.showAllButton,
+                    {
+                      backgroundColor: Glass.inputBackground[colorScheme],
+                      borderColor: Glass.border[colorScheme],
+                    },
+                  ]}
+                >
+                  <Text style={[styles.showAllText, { color: colors.tint }]}>
+                    查看全部
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </GlassCard>
+        }
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+      />
     </SafeAreaView>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
-  const colors = Colors[colorScheme];
-
-  return (
-    <View
-      style={[
-        styles.metric,
-        {
-          backgroundColor: Glass.inputBackground[colorScheme],
-          borderColor: Glass.border[colorScheme],
-        },
-      ]}
-    >
-      <Text style={[styles.metricValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.metricLabel, { color: colors.icon }]}>{label}</Text>
-    </View>
-  );
-}
-
-function Badge({ label, value }: { label: string; value: number | string }) {
-  const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
-  const colors = Colors[colorScheme];
-
-  return (
-    <View
-      style={[
-        styles.badge,
-        {
-          backgroundColor: Glass.inputBackground[colorScheme],
-          borderColor: Glass.border[colorScheme],
-        },
-      ]}
-    >
-      <Text style={[styles.badgeText, { color: colors.icon }]}>
-        {label} {value}
-      </Text>
-    </View>
   );
 }
 
@@ -501,17 +327,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 2,
   },
-  content: {
-    gap: Spacing.md,
+  listContent: {
+    gap: 0,
     padding: Spacing.lg,
     paddingBottom: 56,
   },
-  summaryCard: {
-    borderRadius: Radius.card,
+  listHeader: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
-  summaryGrid: {
-    flexDirection: "row",
-    gap: Spacing.xs,
+  listItemWrapper: {
+    marginBottom: Spacing.sm,
   },
   cleanButton: {
     alignItems: "center",
@@ -520,7 +346,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: Spacing.xs,
-    marginTop: Spacing.sm,
     minHeight: 36,
     paddingHorizontal: Spacing.md,
   },
@@ -531,43 +356,12 @@ const styles = StyleSheet.create({
   cleanupMessage: {
     fontSize: 12,
     fontWeight: "700",
-    marginTop: Spacing.xs,
     textAlign: "center",
   },
-  filterRow: {
-    gap: Spacing.xs,
-    paddingRight: Spacing.lg,
-  },
-  filterChip: {
-    alignItems: "center",
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 5,
-    minHeight: 34,
-    paddingHorizontal: Spacing.sm,
-  },
-  filterText: {
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  metric: {
-    alignItems: "center",
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    flex: 1,
-    minHeight: 58,
-    justifyContent: "center",
-  },
-  metricValue: {
-    fontSize: 20,
-    fontVariant: ["tabular-nums"],
-    fontWeight: "900",
-  },
-  metricLabel: {
+  resultCount: {
     fontSize: 11,
-    fontWeight: "800",
-    marginTop: 2,
+    fontWeight: "700",
+    textAlign: "center",
   },
   emptyCard: {
     borderRadius: Radius.card,
@@ -599,76 +393,6 @@ const styles = StyleSheet.create({
   },
   showAllText: {
     fontSize: 13,
-    fontWeight: "900",
-  },
-  timeline: {
-    gap: Spacing.sm,
-  },
-  sourceCard: {
-    borderRadius: Radius.card,
-  },
-  sourceHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: Spacing.sm,
-  },
-  sourceIcon: {
-    alignItems: "center",
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    height: 34,
-    justifyContent: "center",
-    width: 34,
-  },
-  sourceCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  sourceTitle: {
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  sourceMeta: {
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
-  },
-  badge: {
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 5,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  preview: {
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 19,
-    marginTop: Spacing.sm,
-    opacity: Opacity.subtle,
-  },
-  extractButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
-    minHeight: 34,
-    paddingHorizontal: Spacing.sm,
-  },
-  extractButtonText: {
-    fontSize: 12,
     fontWeight: "900",
   },
 });

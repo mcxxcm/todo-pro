@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "env": {
+    "OCR_PROVIDER": "ocr_space"
+  },
   "rewrites": [
     {
       "source": "/(.*)",

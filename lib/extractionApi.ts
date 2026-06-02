@@ -95,6 +95,38 @@ function normalizeBackendTask(raw: unknown): BackendExtractedTask | null {
   };
 }
 
+const DECOMPOSE_ENDPOINT = "/api/v1/decompose-task";
+
+export interface DecomposeTaskRequest {
+  title: string;
+  notes?: string;
+  dueAt?: string;
+}
+
+export interface DecomposeTaskResult {
+  subtasks: { title: string; estimatedMinutes: number }[];
+}
+
+export async function decomposeTask(
+  input: DecomposeTaskRequest,
+): Promise<DecomposeTaskResult> {
+  const response = await fetch(`${BACKEND_URL}${DECOMPOSE_ENDPOINT}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message ?? `Server error (${response.status})`);
+  }
+
+  const data = await response.json();
+  return {
+    subtasks: Array.isArray(data.subtasks) ? data.subtasks : [],
+  };
+}
+
 function normalizeConfidence(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 0.5;
   return Math.max(0, Math.min(1, value));

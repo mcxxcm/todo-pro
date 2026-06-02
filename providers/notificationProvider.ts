@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import type { NormalizedTask } from "@/types/task";
+import { getNotificationsEnabled } from "@/lib/notificationSettings";
 
 /**
  * Configure global notification behavior for when the app is in the foreground.
@@ -52,6 +53,13 @@ function getTaskNotificationId(taskId: string): string {
  */
 export async function syncTaskNotification(task: NormalizedTask) {
   if (Platform.OS === "web") return;
+
+  // Check global notification toggle
+  const notificationsEnabled = await getNotificationsEnabled();
+  if (!notificationsEnabled) {
+    await cancelTaskNotification(task.id);
+    return;
+  }
 
   const notificationId = getTaskNotificationId(task.id);
 

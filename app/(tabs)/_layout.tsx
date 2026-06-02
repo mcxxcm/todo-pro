@@ -8,9 +8,11 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { Glass, Spacing } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDraftCount } from '@/providers/DraftCountContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const { draftCount } = useDraftCount();
 
   return (
     <Tabs
@@ -52,6 +54,7 @@ export default function TabLayout() {
         options={{
           title: '收件箱',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarBadge: draftCount > 0 ? draftCount : undefined,
         }}
       />
       <Tabs.Screen

@@ -4,7 +4,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { DataCell } from "@/components/settings/MetricCell";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Colors } from "@/constants/theme";
-import { Glass, Radius, Spacing } from "@/constants/tokens";
+import { Glass, Radius, Spacing, StatusColors } from "@/constants/tokens";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import type { LocalDataSummary } from "@/providers/localDataProvider";
 
@@ -25,17 +25,21 @@ export function LocalDataPanel({
   onCreateExportSnapshot,
   onOpenSourceLibrary,
   onRefresh,
+  onShareLocalData,
   summary,
 }: {
   clearArmed: boolean;
   exportSnapshot: {
     exportedAt: string;
+    fileUri?: string;
+    shared?: boolean;
     size: number;
   } | null;
   onClearLocalData: () => void;
   onCreateExportSnapshot: () => void;
   onOpenSourceLibrary: () => void;
   onRefresh: () => void;
+  onShareLocalData: () => void;
   summary: LocalDataSummary;
 }) {
   const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
@@ -71,6 +75,26 @@ export function LocalDataPanel({
         <DataCell label="来源" value={summary.sources} />
         <DataCell label="同步" value={summary.syncRecords} />
       </View>
+
+      {(() => {
+        const estimatedBytes = (summary.tasks + summary.drafts + summary.sources) * 2048;
+        const estimatedKb = Math.round(estimatedBytes / 1024);
+        const displaySize = estimatedKb > 1024 ? `${(estimatedKb / 1024).toFixed(1)} MB` : `${estimatedKb} KB`;
+        return (
+          <Text style={[styles.storageEstimate, { color: colors.icon }]}>
+            预估存储: ~{displaySize} (基于 {summary.tasks + summary.drafts + summary.sources} 条记录)
+          </Text>
+        );
+      })()}
+
+      {summary.tasks > 500 && (
+        <View style={[styles.perfWarning, { backgroundColor: StatusColors.warning + "18", borderColor: StatusColors.warning + "40" }]}>
+          <MaterialIcons name="warning" size={14} color={StatusColors.warning} />
+          <Text style={[styles.perfWarningText, { color: StatusColors.warning }]}>
+            任务数超过 500，建议考虑启用 SQLite 存储以获得更好的性能。
+          </Text>
+        </View>
+      )}
 
       <View style={styles.sourceTypeGrid}>
         {SOURCE_TYPE_LABELS.map((item) => (
@@ -144,8 +168,8 @@ export function LocalDataPanel({
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={onCreateExportSnapshot}
-        accessibilityLabel="生成本地数据导出快照"
+        onPress={onShareLocalData}
+        accessibilityLabel="导出并分享本地数据"
         activeOpacity={0.7}
         style={[
           styles.exportButton,
@@ -157,12 +181,33 @@ export function LocalDataPanel({
       >
         <MaterialIcons name="ios-share" size={16} color={colors.tint} />
         <Text style={[styles.exportButtonText, { color: colors.tint }]}>
-          生成导出快照
+          导出并分享 JSON
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onCreateExportSnapshot}
+        accessibilityLabel="生成本地数据导出快照"
+        activeOpacity={0.7}
+        style={[
+          styles.snapshotButton,
+          {
+            borderColor: Glass.border[colorScheme],
+          },
+        ]}
+      >
+        <MaterialIcons name="data-object" size={15} color={colors.icon} />
+        <Text style={[styles.snapshotButtonText, { color: colors.icon }]}>
+          仅生成快照
         </Text>
       </TouchableOpacity>
       {exportSnapshot && (
         <Text style={[styles.exportMeta, { color: colors.icon }]}>
-          {new Date(exportSnapshot.exportedAt).toLocaleString()} ·{" "}
+          {exportSnapshot.shared === true
+            ? "已打开分享"
+            : exportSnapshot.shared === false
+              ? "已写入文件"
+              : "已生成快照"}{" "}
+          · {new Date(exportSnapshot.exportedAt).toLocaleString()} ·{" "}
           {exportSnapshot.size} bytes
         </Text>
       )}
@@ -206,11 +251,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
   },
+  snapshotButton: {
+    alignItems: "center",
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: Spacing.xs,
+    justifyContent: "center",
+    marginTop: Spacing.xs,
+    minHeight: 36,
+    paddingHorizontal: Spacing.md,
+  },
+  snapshotButtonText: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
   exportMeta: {
     fontSize: 12,
     fontWeight: "700",
     marginTop: Spacing.xs,
     textAlign: "center",
+  },
+  storageEstimate: {
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: Spacing.xs,
+    textAlign: "center",
+  },
+  perfWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  perfWarningText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
   },
   iconButton: {
     alignItems: "center",

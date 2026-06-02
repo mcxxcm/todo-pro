@@ -4,6 +4,9 @@ import type {
   TaskPriority,
   TimeConfidence,
   TimeStatus,
+  SubTask,
+  RecurrenceRule,
+  FocusSession,
 } from "@/types/task";
 import { toIsoString, type ClockInput } from "@/lib/time";
 
@@ -18,6 +21,13 @@ export interface CreateTaskExtra {
   sourceText?: string;
   tags?: string[];
   timeConfidence?: TimeConfidence;
+  subtasks?: SubTask[];
+  recurrence?: RecurrenceRule;
+  estimatedMinutes?: number;
+  actualMinutes?: number;
+  completedAt?: string;
+  xp?: number;
+  focusSessions?: FocusSession[];
 }
 
 export function createNormalizedTask(
@@ -51,5 +61,12 @@ export function createNormalizedTask(
     ...(extra?.sourceId?.trim() && { sourceId: extra.sourceId.trim() }),
     ...(extra?.sourceType && { sourceType: extra.sourceType }),
     ...(extra?.sourceText?.trim() && { sourceText: extra.sourceText.trim() }),
+    ...(extra?.subtasks && { subtasks: extra.subtasks }),
+    ...(extra?.recurrence && { recurrence: extra.recurrence }),
+    ...(extra?.estimatedMinutes && { estimatedMinutes: extra.estimatedMinutes }),
+    ...(extra?.actualMinutes && { actualMinutes: extra.actualMinutes }),
+    ...(extra?.completedAt && { completedAt: extra.completedAt }),
+    ...(extra?.xp && { xp: extra.xp }),
+    ...(extra?.focusSessions && { focusSessions: extra.focusSessions }),
   };
 }

@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 7.0.0"
+    "version": ">= 14.7.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -11,6 +12,10 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://backend-three-azure-33.vercel.app",
+        "EXPO_PUBLIC_ANDROID_BACKEND_URL": "https://backend-three-azure-33.vercel.app"
       }
     },
     "production": {}

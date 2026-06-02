@@ -7,6 +7,7 @@ import { clearTaskDrafts, loadTaskDrafts } from "@/lib/draftStorage";
 import { clearSources, loadSources } from "@/lib/sourceStorage";
 import { clearSyncRecords, loadSyncRecords } from "@/lib/syncStorage";
 import { clearTasks, loadTasks } from "@/lib/taskStorage";
+import { shareLocalDataBundle } from "@/lib/localDataShare";
 import type { SourceItemType } from "@/types/source";
 
 export interface LocalDataSummary {
@@ -69,4 +70,8 @@ export async function exportAllLocalData() {
     syncRecords,
     tasks,
   });
+}
+
+export async function shareAllLocalData() {
+  return shareLocalDataBundle(await exportAllLocalData());
 }

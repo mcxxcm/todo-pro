@@ -31,6 +31,7 @@ export function TimeReviewActionCard({
       <TouchableOpacity
         activeOpacity={0.72}
         accessibilityLabel="全部确认模糊时间"
+        accessibilityRole="button"
         onPress={onConfirmAll}
         style={[
           styles.button,

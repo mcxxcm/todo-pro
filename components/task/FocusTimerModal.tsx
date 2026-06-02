@@ -167,7 +167,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
             <Text style={[styles.title, { color: colors.text }]}>
               {phase === "work" ? (paused ? "已暂停" : "专注中") : phase === "break" ? "休息一下" : "番茄钟"}
             </Text>
-            <TouchableOpacity onPress={handleClose} accessibilityLabel="关闭番茄钟">
+            <TouchableOpacity onPress={handleClose} accessibilityLabel="关闭番茄钟" accessibilityRole="button">
               <MaterialIcons name="close" size={20} color={colors.icon} />
             </TouchableOpacity>
           </View>
@@ -200,6 +200,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
               onPress={startWork}
               style={[styles.startBtn, { backgroundColor: colors.tint }]}
               accessibilityLabel="开始专注"
+              accessibilityRole="button"
             >
               <MaterialIcons name="timer" size={18} color={colorScheme === "dark" ? "#11181C" : "#fff"} />
               <Text style={[styles.startBtnText, colorScheme === "dark" && { color: "#11181C" }]}>
@@ -214,6 +215,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
                 onPress={togglePause}
                 style={[styles.controlBtn, { borderColor: colors.tint }]}
                 accessibilityLabel={paused ? "继续" : "暂停"}
+                accessibilityRole="button"
               >
                 <MaterialIcons name={paused ? "play-arrow" : "pause"} size={16} color={colors.tint} />
                 <Text style={[styles.controlBtnText, { color: colors.tint }]}>
@@ -225,6 +227,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
                 onPress={finishEarly}
                 style={[styles.controlBtn, { borderColor: StatusColors.success }]}
                 accessibilityLabel="提前结束并记录"
+                accessibilityRole="button"
               >
                 <MaterialIcons name="done" size={16} color={StatusColors.success} />
                 <Text style={[styles.controlBtnText, { color: StatusColors.success }]}>
@@ -236,6 +239,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
                 onPress={handleClose}
                 style={[styles.controlBtn, { borderColor: colors.icon }]}
                 accessibilityLabel="跳过并放弃"
+                accessibilityRole="button"
               >
                 <MaterialIcons name="close" size={16} color={colors.icon} />
                 <Text style={[styles.controlBtnText, { color: colors.icon }]}>
@@ -250,6 +254,7 @@ export function FocusTimerModal({ visible, onClose, onComplete }: FocusTimerModa
               onPress={handleClose}
               style={[styles.skipBtn, { borderColor: Glass.border[colorScheme] }]}
               accessibilityLabel="跳过休息"
+              accessibilityRole="button"
             >
               <Text style={[styles.skipBtnText, { color: colors.icon }]}>跳过休息</Text>
             </TouchableOpacity>

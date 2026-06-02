@@ -236,6 +236,8 @@ export function TaskItem({ task, onToggle, onUpdate, onDelete, selectionMode, se
               { backgroundColor: Glass.inputBackground[colorScheme], borderColor: Glass.border[colorScheme] },
             ]}
             accessibilityLabel="编辑任务"
+            accessibilityRole="button"
+            accessibilityHint="打开任务详情编辑"
           >
             <MaterialIcons name="edit" size={14} color={colors.tint} />
           </TouchableOpacity>
@@ -246,6 +248,8 @@ export function TaskItem({ task, onToggle, onUpdate, onDelete, selectionMode, se
               { backgroundColor: Glass.inputBackground[colorScheme], borderColor: Glass.border[colorScheme] },
             ]}
             accessibilityLabel="删除任务"
+            accessibilityRole="button"
+            accessibilityHint="删除后不可恢复"
           >
             <MaterialIcons name="close" size={14} color={colors.icon} />
           </TouchableOpacity>

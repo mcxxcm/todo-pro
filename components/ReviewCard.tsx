@@ -303,6 +303,7 @@ export function ReviewCard({
               ]}
               activeOpacity={0.7}
               accessibilityLabel="确认候选任务时间"
+              accessibilityRole="button"
             >
               <Text style={[styles.timeConfirmText, { color: colors.tint }]}>
                 确认时间
@@ -328,6 +329,7 @@ export function ReviewCard({
           style={[styles.actionBtn, styles.dismissBtn]}
           activeOpacity={0.7}
           accessibilityLabel="忽略候选任务"
+          accessibilityRole="button"
         >
           <MaterialIcons name="close" size={15} color={colors.icon} />
           <Text style={[styles.actionText, { color: colors.icon }]}>
@@ -346,6 +348,7 @@ export function ReviewCard({
           ]}
           activeOpacity={0.7}
           accessibilityLabel="确认保存候选任务"
+          accessibilityRole="button"
         >
           <MaterialIcons
             name="check"

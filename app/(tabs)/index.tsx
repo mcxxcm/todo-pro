@@ -431,7 +431,7 @@ export default function InboxScreen() {
               style={styles.errorIcon}
             />
             <ThemedText style={styles.errorText}>{tasksError}</ThemedText>
-            <TouchableOpacity onPress={refresh} style={styles.retryButton}>
+            <TouchableOpacity onPress={refresh} style={styles.retryButton} accessibilityLabel="重试加载" accessibilityRole="button">
               <ThemedText type="link">重试</ThemedText>
             </TouchableOpacity>
           </GlassCard>
@@ -496,7 +496,7 @@ export default function InboxScreen() {
                       returnKeyType="search"
                     />
                     {searchQuery.length > 0 && (
-                      <TouchableOpacity onPress={() => { setSearchQuery(""); setActiveTag(null); }} style={styles.searchClear}>
+                      <TouchableOpacity onPress={() => { setSearchQuery(""); setActiveTag(null); }} style={styles.searchClear} accessibilityLabel="清除搜索" accessibilityRole="button" accessibilityHint="清除搜索文本和标签筛选">
                         <MaterialIcons name="close" size={14} color={colors.icon} />
                       </TouchableOpacity>
                     )}
@@ -576,7 +576,7 @@ export default function InboxScreen() {
 
           {selectionMode && (
             <View style={[styles.batchBar, { backgroundColor: Glass.inputBackground[colorScheme], borderColor: colors.tint }]}>
-              <TouchableOpacity onPress={exitSelectionMode} style={styles.batchCancel}>
+              <TouchableOpacity onPress={exitSelectionMode} style={styles.batchCancel} accessibilityLabel="取消批量选择" accessibilityRole="button">
                 <ThemedText style={[styles.batchCancelText, { color: colors.icon }]}>取消</ThemedText>
               </TouchableOpacity>
               <ThemedText style={[styles.batchCount, { color: colors.text }]}>
@@ -585,6 +585,8 @@ export default function InboxScreen() {
               <TouchableOpacity
                 onPress={() => void handleBatchComplete()}
                 style={[styles.batchAction, { borderColor: StatusColors.success }]}
+                accessibilityLabel="批量标记完成"
+                accessibilityRole="button"
               >
                 <MaterialIcons name="check-circle" size={16} color={StatusColors.success} />
                 <ThemedText style={[styles.batchActionText, { color: StatusColors.success }]}>完成</ThemedText>
@@ -592,6 +594,8 @@ export default function InboxScreen() {
               <TouchableOpacity
                 onPress={() => void handleBatchDelete()}
                 style={[styles.batchAction, { borderColor: StatusColors.danger }]}
+                accessibilityLabel="批量删除"
+                accessibilityRole="button"
               >
                 <MaterialIcons name="delete" size={16} color={StatusColors.danger} />
                 <ThemedText style={[styles.batchActionText, { color: StatusColors.danger }]}>删除</ThemedText>

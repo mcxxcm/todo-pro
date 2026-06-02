@@ -263,6 +263,8 @@ export function TaskDetailModal({
                     onPress={() => { onDelete(task.id); onClose(); }}
                     style={[styles.headerBtn, { borderColor: StatusColors.danger + "60" }]}
                     accessibilityLabel="删除任务"
+                    accessibilityRole="button"
+                    accessibilityHint="删除后不可恢复"
                   >
                     <MaterialIcons name="delete-outline" size={16} color={StatusColors.danger} />
                   </TouchableOpacity>
@@ -311,6 +313,8 @@ export function TaskDetailModal({
               onPress={() => onToggleDone?.(task.id)}
               style={[styles.statusRow, { borderColor: Glass.border[colorScheme] }]}
               accessibilityLabel={task.status === "done" ? "标记为未完成" : "标记为完成"}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: task.status === "done" }}
             >
               <MaterialIcons
                 name={task.status === "done" ? "check-circle" : "radio-button-unchecked"}
@@ -355,6 +359,8 @@ export function TaskDetailModal({
                     onPress={() => setDatePickerVisible(true)}
                     style={[styles.calendarBtn, { borderColor: Glass.border[colorScheme] }]}
                     accessibilityLabel="选择日期"
+                    accessibilityRole="button"
+                    accessibilityHint="打开日期选择器"
                   >
                     <MaterialIcons name="calendar-today" size={16} color={colors.tint} />
                   </TouchableOpacity>
@@ -427,6 +433,8 @@ export function TaskDetailModal({
                       onPress={() => handleToggleSubtask(st.id)}
                       style={styles.subtaskCheck}
                       accessibilityLabel={st.status === "done" ? "标记子任务未完成" : "标记子任务完成"}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: st.status === "done" }}
                     >
                       <MaterialIcons
                         name={st.status === "done" ? "check-circle" : "radio-button-unchecked"}
@@ -535,7 +543,7 @@ export function TaskDetailModal({
                     <Text style={[styles.decomposeTitle, { color: colors.tint }]}>
                       AI 拆解结果
                     </Text>
-                    <TouchableOpacity onPress={handleAcceptAllDecomposition} style={styles.acceptAllBtn}>
+                    <TouchableOpacity onPress={handleAcceptAllDecomposition} style={styles.acceptAllBtn} accessibilityLabel="全部接受AI拆解结果" accessibilityRole="button">
                       <Text style={[styles.acceptAllText, { color: StatusColors.success }]}>全部接受</Text>
                     </TouchableOpacity>
                   </View>
@@ -721,6 +729,8 @@ export function TaskDetailModal({
                         setEditingActual(true);
                       }}
                       accessibilityLabel="修改实际耗时"
+                      accessibilityRole="button"
+                      accessibilityHint="修改已记录的实际耗时"
                     >
                       <MaterialIcons name="edit" size={14} color={colors.tint} />
                     </TouchableOpacity>

@@ -1,154 +1,122 @@
-# DeepSeek Handoff: Todo Pro Audit Completion
+# DeepSeek Handoff: Todo Pro Next Atomic Work
 
-你在 `/Users/mcx/todo-pro` 中继续修复 Todo Pro 审批剩余问题。不要重构无关文件，不要覆盖用户未要求的改动。
+你在 `/Users/mcx/todo-pro` 中继续 Todo Pro 的下一批原子任务。不要重构无关文件，不要覆盖用户未要求的改动。
 
 ## 当前验证结果
 
+2026-06-02 本轮 Codex 复核结果：
+
 - `npm run test:all`: 通过
+- `npm run test:ui`: 通过，7 suites / 31 tests
 - `npx tsc --noEmit`: 通过
-- `npx eslint . --no-cache`: 0 errors，45 warnings
+- `npx eslint . --no-cache`: 通过，0 errors / 0 warnings
 - `cd backend && npm run test:all && npx tsc --noEmit && npm run build`: 通过
-- `npx jest --runInBand`: 失败
+- `git status --short`: 本轮文档更新前为空；当前应只看到 `.reasonix/todo_pro_current_atomic_checklist.md` 与本 handoff 文档变更
+- 安全扫描：`.env` 与 `backend/.env` 已被 ignore；未发现 DeepSeek/Todoist 真实 token 被 git 跟踪；Firebase `apiKey` 为公开客户端配置，发布前仍需 README 明确边界
 
-Jest 失败要点：
+## 已完成验收项
 
-- `jest.config.js` 使用了错误字段 `setupFilesAfterSetup`，应为 `setupFilesAfterEnv`。
-- Jest 运行时出现 `this._moduleMocker.clearMocksOnScope is not a function`。
-- Jest 扫描到了 `backend/dist` 和非 React Native Testing Library 的脚本测试。
+以下旧 handoff 问题已通过验证，不要重复返工：
+
+1. React Native Testing Library / Jest 基础设施已可运行：`npm run test:ui` 通过。
+2. AI 任务拆解编辑与接受流程已落地：`TaskDetailModal` UI 测试覆盖。
+3. `actualMinutes` 记录和统计展示已落地：`TaskDetailModal` / `TaskItem` / `StatsPanel` 测试覆盖。
+4. FocusSession 前台体验和统计已落地：`FocusTimerModal` / `StatsPanel` 测试覆盖；后台/锁屏通知仍 planned。
+5. 前后端中文时间解析一致性测试已落地：`domain/timeConsistency.test.ts` 通过。
+6. 关于卡片基础问题已修复，Lint 为 0 warnings。
 
 ## 必须修复
 
-### 1. 修复 React Native Testing Library / Jest 基础设施
+### 1. P1-4 通知系统用户反馈
 
-目标：新增的 UI 组件测试必须能被独立命令稳定运行，不能只通过 `tsconfig` 排除来假装通过。
+现状：
+
+- `providers/notificationProvider.ts` 会根据 `dueAt` 调度或取消本地通知。
+- `providers/localProvider.ts`、`providers/firebaseProvider.ts` 已在创建、更新、完成、删除任务时调用通知同步。
+- UI 还不能可靠告诉用户“提醒已安排 / 已更新 / 已取消 / 权限拒绝 / Web 不支持 / 通知关闭”。
+
+目标：
+
+- 任务保存永远不能被通知权限或平台限制阻断。
+- 通知同步要返回结构化结果，UI 根据结果展示短反馈。
+- 不要把一次性的通知反馈状态持久化到 `Task`。
 
 建议文件：
 
-- `jest.config.js`
-- `package.json`
-- `components/__tests__/TaskItem.test.tsx`
-- `components/__tests__/ReviewCard.test.tsx`
-- `components/__tests__/TaskComposer.test.tsx`
+- `providers/notificationProvider.ts`
+- `providers/localProvider.ts`
+- `providers/firebaseProvider.ts`
+- `hooks/useLocalTasks.ts`
+- `hooks/useTasks.ts`
+- `app/(tabs)/index.tsx`
+- `components/task/TaskDetailModal.tsx`
+- `components/__tests__/*`
 
-要求：
+实现要求：
 
-- 把 `setupFilesAfterSetup` 改为 `setupFilesAfterEnv`。
-- 增加明确脚本，例如：
+1. 将 `syncTaskNotification` 改为返回结构化结果，例如：
 
-```json
-{
-  "scripts": {
-    "test:ui": "jest components/__tests__ --runInBand"
-  }
-}
+```ts
+type TaskNotificationSyncResult =
+  | { status: "scheduled"; notificationId: string }
+  | { status: "updated"; notificationId: string }
+  | { status: "cancelled"; reason: "completed" | "deleted" | "missing_dueAt" | "past_due" | "disabled" }
+  | { status: "permission_denied" }
+  | { status: "unsupported"; reason: "web" | "simulator" }
+  | { status: "none"; reason: "no_dueAt" | "not_todo" };
 ```
 
-- 配置 `testPathIgnorePatterns` 或 `testMatch`，避免扫到：
-  - `backend/dist`
-  - `backend/src`
-  - `domain/*.test.ts`
-  - `lib/*.test.ts`
-  - `extractors/*.test.ts`
-- 若 `jest@30` 与 `jest-expo` 不兼容，调整到 Expo/Jest preset 可工作的版本组合。
-- 运行并通过 `npm run test:ui`。
+2. `createLocalTask` / Firebase `addTask` 将通知结果随返回值带给调用方，但保存到 storage / Firestore 的仍是纯 `NormalizedTask`。
+3. 手动创建带未来 `dueAt` 的任务后，Inbox 显示“提醒已安排”或“通知权限未开启”的短反馈。
+4. 任务详情修改 `dueAt` 后显示“提醒已更新”；清空 `dueAt`、完成、删除任务后显示“提醒已取消”。
+5. Web、模拟器、通知关闭、权限拒绝都要有可理解提示，不抛错、不阻断任务保存。
+6. 增加测试覆盖通知结果分支和至少一个 UI 反馈文案。
 
-### 2. 补强 A4 AI 任务拆解
+验收标准：
 
-当前状态：`TaskDetailModal` 接受 AI 拆解时已经调用 `onUpdate(task.id, { subtasks })`，但用户不能编辑拆解结果后再接受。
+- `npm run test:all` 通过
+- `npm run test:ui` 通过
+- `npx tsc --noEmit` 通过
+- `npx eslint . --no-cache` 通过，0 warnings
+- Web 环境不会因通知 API 报错
+- Android 或 iOS 至少一个平台手动验证：创建带截止时间任务后能看到反馈
 
-建议文件：
+### 2. P4-3 README 密钥边界说明
 
-- `components/task/TaskDetailModal.tsx`
+现状：
 
-要求：
-
-- 每条 `decompositionResult` 提供可编辑标题输入。
-- 每条 `decompositionResult` 提供可编辑预计分钟输入。
-- 支持接受单条、拒绝单条、全部接受。
-- 接受后立即持久化到 `task.subtasks`，并在当前详情 UI 中看到新增子任务。
-
-### 3. 补强 B3 actualMinutes
-
-当前状态：详情页有 `actualMinutes` 字段编辑，但完成任务时没有明显记录实际耗时入口。
+- 安全扫描会命中 `lib/firebase.ts` 和 `mac-tools/ocr-claw.ts` 中的 Firebase `apiKey`。
+- 这些是客户端 Firebase public config，不等同于服务端密钥，但 README 需要明确说明，避免误报。
 
 建议文件：
 
-- `components/task/TaskDetailModal.tsx`
-- `components/TaskItem.tsx` 或完成流程相关组件
-- `components/settings/StatsPanel.tsx`
-
-要求：
-
-- 在任务完成后提供明显的“记录实际耗时”动作，或完成任务时弹出/进入记录入口。
-- `actualMinutes` 写入 `TaskUpdateInput`。
-- `StatsPanel` 展示预估 vs 实际偏差时能消费该字段。
-
-### 4. 补强 B6 FocusSession
-
-当前状态：`FocusTimerModal` 可以写入 `focusSessions`，但没有后台/锁屏通知，也没有统计展示。
-
-建议文件：
-
-- `components/task/FocusTimerModal.tsx`
-- `components/settings/StatsPanel.tsx`
 - `README.md`
+- `README_zh.md`
 
 要求：
 
-- 在统计面板展示专注次数、总专注分钟数。
-- 如暂不做后台/锁屏通知，在 UI 或 README 明确标注后台/锁屏通知为 planned。
-- 保证 `focusSessions` 追加写入不会覆盖已有 session。
+- 明确 DeepSeek API key 只能放在 backend `.env`。
+- 明确 Todoist token 仅存本地 AsyncStorage，不提交 repo。
+- 明确 Firebase client config 可公开，但 Firestore/Auth 权限必须由 Firebase rules 和 Auth 保护。
+- 保持 `.env` / `backend/.env` / `backend/dist` ignore 说明。
 
-### 5. 补强 E1 时间解析一致性测试
+验收标准：
 
-当前状态：`domain/timeConsistency.test.ts` 只测了 frontend parser，没有真正比较 backend parser。
+- `rg -n "DEEPSEEK_API_KEY|TODO_PRO_PASSWORD|Bearer|apiKey" . -g '!node_modules/**' -g '!backend/dist/**'` 的命中均可解释，无真实 secret。
+- README 与 README_zh 文案一致。
 
-建议文件：
+## 可选后续
 
-- `domain/timeConsistency.test.ts`
-- `lib/clientTimeParser.ts`
-- `backend/src/time/parseChineseTime.ts`
+### P3-2 无障碍回归
 
-要求：
+- 建立 accessibility checklist。
+- 为关键 icon button 补 `accessibilityHint`。
+- UI 测试检查新建任务、确认 AI 草稿、完成任务、记录实际耗时的 label/role/state。
 
-- 同一组样例同时调用：
-  - `parseClientDateInfo`
-  - `parseChineseDateInfo`
-- 对常见表达比较解析能力和日期粒度是否一致。
-- 样例至少包含：
-  - `明天下午3点`
-  - `今晚八点前`
-  - `下周五`
-  - `下个月3号`
-  - `月底前`
-  - `半小时后`
+### P2-1 Todoist OAuth
 
-### 6. 修复 G2 关于卡片
-
-当前状态：设置页“隐私政策”按钮没有 `onPress`；反馈邮件用 `router.push("mailto:...")` 不合适。
-
-建议文件：
-
-- `app/(tabs)/explore.tsx`
-
-要求：
-
-- 使用 `Linking.openURL("mailto:feedback@todopro.app")` 打开反馈邮件。
-- 给“隐私政策”按钮加真实链接或本地文档入口。
-- 版本号/构建号优先从 `package.json`、`app.json` 或 `expo-constants` 读取，不要硬编码漂移。
-
-### 7. 清理明显 lint warning 和小瑕疵
-
-按 `npx eslint . --no-cache` 输出清理：
-
-- `app/(tabs)/index.tsx`: 未使用 `ocrError` / `clearOcrError`
-- `components/task/TaskDetailModal.tsx`: 未使用 `display*` / `editingDoneCount`
-- `components/settings/AchievementGallery.tsx`: hook dependency warning
-- `components/settings/WeeklyReportPanel.tsx`: hook dependency warning
-- `components/task/FocusTimerModal.tsx`: hook dependency warning
-- `components/__tests__/*`: `import/first`
-- `providers/firebaseProvider.ts`: 未使用 `getDocs` / `where`
-- 其他 unused import 按 eslint 输出清理
+- 当前 Personal API Token 路径可用，OAuth 仍 planned。
+- 若实施，优先使用 Expo AuthSession，不要把 client secret 放进移动端。
 
 ## 完成后必须运行
 
@@ -162,9 +130,20 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 
 ## 最终回复格式
 
-请输出：
+```text
+改动文件：
+- ...
 
-- 改动文件列表
-- 每个修复项的验收状态
-- 所有验证命令结果
-- 仍未完成或明确 planned 的项目
+完成原子项：
+- [Px-y] ...
+
+验证：
+- npm run test:all: pass/fail
+- npm run test:ui: pass/fail
+- npx tsc --noEmit: pass/fail
+- npx eslint . --no-cache: pass/fail
+- backend test/typecheck/build: pass/fail
+
+剩余风险：
+- ...
+```

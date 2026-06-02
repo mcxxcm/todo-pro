@@ -8,7 +8,7 @@ import { detectFirebaseConflict, FirebaseConflictError } from "@/domain/firebase
 import { NormalizedTask, TaskUpdateInput } from "@/types/task";
 import { generateId } from "@/lib/taskStorage";
 import { getCurrentIsoString } from "@/lib/time";
-import { syncTaskNotification, cancelTaskNotification } from "./notificationProvider";
+import { syncTaskNotification, cancelTaskNotification, TaskNotificationSyncResult } from "./notificationProvider";
 import { findDuplicateTaskGroups } from "@/domain/taskDuplicates";
 import { needsTimeReview } from "@/domain/taskGrouping";
 import type { SourceItemType } from "@/types/source";
@@ -18,6 +18,7 @@ export function useFirebaseTasks() {
   const [tasks, setTasks] = useState<NormalizedTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notificationFeedback, setNotificationFeedback] = useState<TaskNotificationSyncResult | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -60,7 +61,8 @@ export function useFirebaseTasks() {
         });
         const taskRef = doc(db, "users", user.uid, "tasks", task.id);
         await setDoc(taskRef, task);
-        await syncTaskNotification(task);
+        const notification = await syncTaskNotification(task);
+        setNotificationFeedback(notification);
         return task;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to add task");
@@ -86,10 +88,10 @@ export function useFirebaseTasks() {
 
   const toggleDone = useCallback(
     async (id: string) => {
-      if (!user) return;
+      if (!user) return undefined;
       try {
         const task = tasks.find((t) => t.id === id);
-        if (!task) return;
+        if (!task) return undefined;
 
         await checkConflict(id, task.updatedAt);
         
@@ -102,7 +104,8 @@ export function useFirebaseTasks() {
         });
         
         const updatedTask = { ...task, status: newStatus as NormalizedTask["status"], updatedAt: getCurrentIsoString() };
-        await syncTaskNotification(updatedTask);
+        const notification = await syncTaskNotification(updatedTask);
+        setNotificationFeedback(notification);
 
         if (task.recurrence && task.dueAt && task.status === "todo") {
           const next = computeNextOccurrence(task.recurrence, task.dueAt);
@@ -133,7 +136,7 @@ export function useFirebaseTasks() {
 
   const updateTask = useCallback(
     async (id: string, patch: TaskUpdateInput) => {
-      if (!user) return;
+      if (!user) return undefined;
       try {
         const existingTask = tasks.find((t) => t.id === id);
         if (existingTask) await checkConflict(id, existingTask.updatedAt);
@@ -144,11 +147,12 @@ export function useFirebaseTasks() {
           ...normalized,
           updatedAt: getCurrentIsoString(),
         });
-        
-        // Re-sync notification using updated state
-        if (existingTask) {
-          await syncTaskNotification({ ...existingTask, ...normalized, updatedAt: getCurrentIsoString() } as NormalizedTask);
-        }
+
+        if (!existingTask) return;
+
+        const updatedTask = { ...existingTask, ...normalized, updatedAt: getCurrentIsoString() } as NormalizedTask;
+        const notification = await syncTaskNotification(updatedTask);
+        setNotificationFeedback(notification);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to update task");
       }
@@ -163,6 +167,7 @@ export function useFirebaseTasks() {
         const taskRef = doc(db, "users", user.uid, "tasks", id);
         await deleteDoc(taskRef);
         await cancelTaskNotification(id);
+        setNotificationFeedback({ status: "cancelled", reason: "deleted" });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to delete task");
       }
@@ -258,6 +263,10 @@ export function useFirebaseTasks() {
     // onSnapshot handles real-time sync, refresh is a no-op but kept for API compatibility
   }, []);
 
+  const clearNotificationFeedback = useCallback(() => {
+    setNotificationFeedback(null);
+  }, []);
+
   return {
     tasks,
     loading,
@@ -269,6 +278,8 @@ export function useFirebaseTasks() {
     mergeDuplicates,
     confirmAllTimeReviews,
     refresh,
+    notificationFeedback,
+    clearNotificationFeedback,
   };
 }
 

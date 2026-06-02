@@ -5,7 +5,7 @@ import { NormalizedTask, TaskUpdateInput } from "@/types/task";
 import { loadTasks, saveTasks, generateId } from "@/lib/taskStorage";
 import { getCurrentIsoString } from "@/lib/time";
 import type { SourceItemType } from "@/types/source";
-import { syncTaskNotification, cancelTaskNotification } from "./notificationProvider";
+import { syncTaskNotification, cancelTaskNotification, TaskNotificationSyncResult } from "./notificationProvider";
 
 export async function getLocalTasks(): Promise<NormalizedTask[]> {
   return loadTasks();
@@ -14,7 +14,7 @@ export async function getLocalTasks(): Promise<NormalizedTask[]> {
 export async function createLocalTask(
   title: string,
   extra?: CreateTaskExtra,
-): Promise<NormalizedTask> {
+): Promise<{ task: NormalizedTask; notification: TaskNotificationSyncResult }> {
   const tasks = await loadTasks();
   const task = createNormalizedTask(title, extra, {
     id: generateId(),
@@ -22,11 +22,11 @@ export async function createLocalTask(
   });
   tasks.push(task);
   await saveTasks(tasks);
-  await syncTaskNotification(task);
-  return task;
+  const notification = await syncTaskNotification(task);
+  return { task, notification };
 }
 
-export async function toggleLocalTask(id: string): Promise<NormalizedTask> {
+export async function toggleLocalTask(id: string): Promise<{ task: NormalizedTask; notification: TaskNotificationSyncResult }> {
   const tasks = await loadTasks();
   const index = tasks.findIndex((t) => t.id === id);
   if (index === -1) throw new Error(`Task ${id} not found`);
@@ -35,14 +35,14 @@ export async function toggleLocalTask(id: string): Promise<NormalizedTask> {
   task.updatedAt = getCurrentIsoString();
   tasks[index] = task;
   await saveTasks(tasks);
-  await syncTaskNotification(task);
-  return task;
+  const notification = await syncTaskNotification(task);
+  return { task, notification };
 }
 
 export async function updateLocalTask(
   id: string,
   patch: TaskUpdateInput,
-): Promise<NormalizedTask> {
+): Promise<{ task: NormalizedTask; notification: TaskNotificationSyncResult }> {
   const tasks = await loadTasks();
   const index = tasks.findIndex((t) => t.id === id);
   if (index === -1) throw new Error(`Task ${id} not found`);
@@ -55,14 +55,15 @@ export async function updateLocalTask(
 
   tasks[index] = task;
   await saveTasks(tasks);
-  await syncTaskNotification(task);
-  return task;
+  const notification = await syncTaskNotification(task);
+  return { task, notification };
 }
 
-export async function deleteLocalTask(id: string): Promise<void> {
+export async function deleteLocalTask(id: string): Promise<{ notification: TaskNotificationSyncResult }> {
   const tasks = await loadTasks();
   await saveTasks(tasks.filter((t) => t.id !== id));
   await cancelTaskNotification(id);
+  return { notification: { status: "cancelled", reason: "deleted" } };
 }
 
 export async function mergeDuplicateLocalTasks(): Promise<{

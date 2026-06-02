@@ -16,5 +16,11 @@ export function useTasks() {
     };
   }
 
-  return user ? firebaseTasks : localTasks;
+  const active = user ? firebaseTasks : localTasks;
+
+  return {
+    ...active,
+    notificationFeedback: localTasks.notificationFeedback ?? active.notificationFeedback,
+    clearNotificationFeedback: localTasks.clearNotificationFeedback,
+  };
 }

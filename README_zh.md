@@ -90,6 +90,27 @@ npm run dev
 - **时间复核**：对于模糊的中文时间表达，即使后端已经精准解析（并填入了 `dueAt`），App 依然会在 UI 上高亮标记它，强制要求用户进行肉眼复核。
 - **安全与隐私**：大语言模型（如 DeepSeek）和第三方接口的 API Key 永远只放在您自己控制的后端环境变量中，绝不会打包到客户端 App 中。
 
+## 安全边界 (Security Boundaries)
+
+本项目将凭证分为三类，各自有不同的安全边界：
+
+### 客户端公开配置（可安全提交）
+- **Firebase `apiKey`**（在 `lib/firebase.ts` 和 `mac-tools/ocr-claw.ts` 中）是**公开的客户端标识符**，不是密钥。Firebase 客户端配置设计为公开可见。安全性由 **Firestore 安全规则**和 **Firebase 身份验证**保障，而非隐藏 API Key。
+- Firebase 配置块（`apiKey`、`authDomain`、`projectId` 等）可出现在仓库中，可安全提交。
+
+### 仅限后端的密钥（禁止提交）
+- **DeepSeek API Key**（`DEEPSEEK_API_KEY`）— 只能放在 `backend/.env` 中（已被 gitignore），绝不会打包到移动端 App。
+- **OCR.Space API Key**（`OCR_SPACE_API_KEY`）— 与 DeepSeek 相同约束。
+- **Apple Vision OCR 凭证**（`TODO_PRO_EMAIL`、`TODO_PRO_PASSWORD`）— 仅限 `backend/.env`。
+
+### 本地设备密钥（禁止提交）
+- **Todoist Personal API Token** — 仅存储在设备本地的 AsyncStorage 中，通过 设置 > 集成 配置。绝不提交到仓库。后续 OAuth 2.0 实施时，access token 遵循相同约束。
+
+### 永不上传的文件
+- `.env` 和 `backend/.env` 已被 gitignore。
+- `backend/dist/` 已被 gitignore（构建产物）。
+- 本地数据导出文件不会自动上传。
+
 ## 功能完成度 (Completion Map)
 
 - [x] 本地任务闭环：手动添加、列表、编辑、完成、删除等均通过本地存储完成。

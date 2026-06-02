@@ -15,6 +15,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useTasks } from "@/hooks/useTasks";
+import { notificationMessage } from "@/providers/notificationProvider";
 import { useTaskExtraction } from "@/hooks/useTaskExtraction";
 import { useImageOCR } from "@/hooks/useImageOCR";
 import { useDraftCount } from "@/providers/DraftCountContext";
@@ -57,7 +58,7 @@ export default function InboxScreen() {
     text?: string | string[];
     source?: string | string[];
   }>();
-  const { tasks, loading, error: tasksError, addTask, toggleDone, updateTask, removeTask, mergeDuplicates, confirmAllTimeReviews, refresh } =
+  const { tasks, loading, error: tasksError, addTask, toggleDone, updateTask, removeTask, mergeDuplicates, confirmAllTimeReviews, refresh, notificationFeedback, clearNotificationFeedback } =
     useTasks();
   const { candidates, extracting, error: extractionError, extract, extractFromImage, confirmTask, dismissTask, closePanel, updateCandidate, clearError } =
     useTaskExtraction();
@@ -142,6 +143,13 @@ export default function InboxScreen() {
   const sourceParam = Array.isArray(params.source)
     ? params.source[0]
     : params.source;
+
+  // --- Notification feedback ---
+  useEffect(() => {
+    if (!notificationFeedback) return;
+    const timer = setTimeout(() => clearNotificationFeedback(), 3000);
+    return () => clearTimeout(timer);
+  }, [notificationFeedback, clearNotificationFeedback]);
 
   // --- Handlers ---
 
@@ -520,6 +528,24 @@ export default function InboxScreen() {
                     onConfirmAll={() => void confirmAllTimeReviews()}
                   />
                 )}
+
+                {!!notificationFeedback && notificationFeedback.status !== "none" && (() => {
+                  const text = notificationMessage(notificationFeedback);
+                  const isSuccess = notificationFeedback.status === "scheduled" || notificationFeedback.status === "updated";
+                  const color = isSuccess ? StatusColors.success : StatusColors.warning;
+                  return (
+                    <ThemedView style={[styles.extractErrorBanner, { backgroundColor: color + "1A" }]}>
+                      <MaterialIcons
+                        name={isSuccess ? "notifications-active" : "notifications-off"}
+                        size={16}
+                        color={color}
+                      />
+                      <ThemedText style={[styles.extractErrorText, { color }]}>
+                        {text}
+                      </ThemedText>
+                    </ThemedView>
+                  );
+                })()}
 
                 {!!extractionError && (
                   <ThemedView style={styles.extractErrorBanner}>

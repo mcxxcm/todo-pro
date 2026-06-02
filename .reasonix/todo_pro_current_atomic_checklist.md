@@ -1,8 +1,8 @@
 # Todo Pro 当前项目原子清单与验收标准
 
-> 生成时间：2026-06-02  
+> 更新时间：2026-06-02  
 > 项目路径：`/Users/mcx/todo-pro`  
-> 当前阶段：审计修复已基本通过，进入提交前清理、质量打磨、Phase 3 规划执行阶段。
+> 当前阶段：审计修复验证通过，进入提交前确认、通知反馈打磨、同步/无障碍/发布前安全收口阶段。
 
 ## 当前验证基线
 
@@ -16,13 +16,15 @@ npx eslint . --no-cache
 cd backend && npm run test:all && npx tsc --noEmit && npm run build
 ```
 
-当前已知状态：
+当前已知状态（2026-06-02 本轮复核）：
 
 - `npm run test:all`：通过
-- `npm run test:ui`：通过，3 suites / 14 tests
+- `npm run test:ui`：通过，7 suites / 31 tests
 - `npx tsc --noEmit`：通过
-- `npx eslint . --no-cache`：0 errors，23 warnings
+- `npx eslint . --no-cache`：通过，0 errors / 0 warnings
 - backend test/typecheck/build：通过
+- `git status --short`：本轮文档更新前为空
+- 敏感信息扫描：`.env` 与 `backend/.env` 已被 ignore；未发现 DeepSeek/Todoist 真实 token 被 git 跟踪；Firebase `apiKey` 为公开客户端配置，仍需发布前复核规则说明
 
 ---
 
@@ -30,46 +32,46 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 
 ### P0-1. 清理 ESLint 剩余 warning
 
-现状：`npx eslint . --no-cache` 为 0 errors / 23 warnings，主要是 unused vars、require import、hook deps、duplicate imports。
+现状：`npx eslint . --no-cache` 已为 0 errors / 0 warnings。以下 warning 清理项已完成，本节保留为提交前回归检查。
 
 原子任务：
 
-- [ ] 移除 `components/EmptyTaskState.tsx` 未使用的 `reduceMotion`
-- [ ] 移除 `components/TaskFilterRail.tsx` 未使用的 `Opacity`
-- [ ] 清理 `components/source/*` 未使用 import / 变量
-- [ ] 清理 `components/task/DatePickerModal.tsx` 未使用 import 和不必要 dependency
-- [ ] 清理 `components/ui/MotionListItem.tsx` 未使用 `ready`
-- [ ] 清理 `domain/productivityStats.ts` 未使用类型
-- [ ] 清理 `domain/timeConsistency.test.ts` 未使用类型
-- [ ] 清理 `domain/weeklyReport.ts` 未使用变量
-- [ ] 清理 `extractors/mockExtractor.ts` 未使用 import
-- [ ] 合并 `lib/firebase.ts` duplicate imports，并处理 unused catch 参数
-- [ ] 清理 `lib/migration.test.ts` 未使用变量
-- [ ] 调整 `components/__tests__/TaskItem.test.tsx` 中的 `require()` 和 unused React warning
+- [x] 移除 `components/EmptyTaskState.tsx` 未使用的 `reduceMotion`
+- [x] 移除 `components/TaskFilterRail.tsx` 未使用的 `Opacity`
+- [x] 清理 `components/source/*` 未使用 import / 变量
+- [x] 清理 `components/task/DatePickerModal.tsx` 未使用 import 和不必要 dependency
+- [x] 清理 `components/ui/MotionListItem.tsx` 未使用 `ready`
+- [x] 清理 `domain/productivityStats.ts` 未使用类型
+- [x] 清理 `domain/timeConsistency.test.ts` 未使用类型
+- [x] 清理 `domain/weeklyReport.ts` 未使用变量
+- [x] 清理 `extractors/mockExtractor.ts` 未使用 import
+- [x] 合并 `lib/firebase.ts` duplicate imports，并处理 unused catch 参数
+- [x] 清理 `lib/migration.test.ts` 未使用变量
+- [x] 调整 `components/__tests__/TaskItem.test.tsx` 中的 `require()` 和 unused React warning
 
 验收标准：
 
-- [ ] `npx eslint . --no-cache` 输出 0 errors / 0 warnings
-- [ ] `npm run test:all` 通过
-- [ ] `npm run test:ui` 通过
-- [ ] `npx tsc --noEmit` 通过
+- [x] `npx eslint . --no-cache` 输出 0 errors / 0 warnings
+- [x] `npm run test:all` 通过
+- [x] `npm run test:ui` 通过
+- [x] `npx tsc --noEmit` 通过
 
 ### P0-2. 提交范围确认
 
-现状：工作区存在大量已修改和新增文件，尚未提交。
+现状：本轮复核开始时 `git status --short` 为空；当前只应出现本清单和 DeepSeek handoff 文档更新。
 
 原子任务：
 
-- [ ] 运行 `git status --short`，确认改动均属于 Todo Pro 审计修复范围
-- [ ] 检查是否有不应提交的产物、临时文件、敏感信息
+- [x] 运行 `git status --short`，确认改动均属于 Todo Pro 审计修复范围
+- [x] 检查是否有不应提交的产物、临时文件、敏感信息
 - [ ] 确认 `.reasonix/` 是否作为项目内交接材料提交
-- [ ] 确认 `backend/dist/` 未被纳入 git
+- [x] 确认 `backend/dist/` 未被纳入 git
 
 验收标准：
 
-- [ ] `git status --short` 中无未知产物或密钥文件
-- [ ] `.env`、真实 token、截图临时文件未被 staged
-- [ ] commit 前完整验证命令全部通过
+- [x] `git status --short` 中无未知产物或密钥文件
+- [x] `.env`、真实 token、截图临时文件未被 staged
+- [x] commit 前完整验证命令全部通过
 
 ### P0-3. 创建审计修复提交
 
@@ -145,14 +147,16 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 
 ### P1-4. 通知系统用户反馈
 
-现状：任务 dueAt 生命周期已接入通知调度，设置页有通知开关。
+现状：任务 `dueAt` 生命周期已接入通知调度，设置页有通知开关；但创建/修改/取消提醒时，任务界面还不能可靠展示“已安排/已更新/权限拒绝/已取消”的结果反馈。
 
 原子任务：
 
-- [ ] 创建带 dueAt 任务后显示“提醒已安排”反馈
-- [ ] 权限拒绝时显示可理解提示
-- [ ] 修改 dueAt 后显示“提醒已更新”
-- [ ] 完成/删除任务后取消提醒并可在日志或 UI 中确认
+- [ ] 将 `syncTaskNotification` 改为返回结构化结果：`scheduled` / `updated` / `cancelled` / `permission_denied` / `disabled` / `unsupported` / `past_due` / `none`
+- [ ] `createLocalTask` / Firebase `addTask` 将通知结果随保存结果返回给调用方，但不把通知状态写入持久化 Task
+- [ ] 创建带未来 `dueAt` 的任务后，在 Inbox 展示“提醒已安排”或“通知权限未开启”的短反馈
+- [ ] 任务详情修改 `dueAt` 后展示“提醒已更新”；清空 `dueAt`、完成、删除任务后展示“提醒已取消”
+- [ ] Web / 模拟器 / 通知关闭状态显示可理解提示，不能抛错或阻断任务保存
+- [ ] 为通知 provider 增加纯逻辑测试，覆盖状态分支；UI 层至少覆盖手动创建带 `dueAt` 后的反馈文案
 
 验收标准：
 
@@ -160,6 +164,8 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 - [ ] 权限拒绝不会阻断任务创建
 - [ ] Web 环境不报错
 - [ ] Android/iOS 至少一个平台手动验证通过
+- [ ] `npm run test:all`、`npm run test:ui`、`npx tsc --noEmit`、`npx eslint . --no-cache` 全部通过
+- [ ] README 对 Web/模拟器/后台锁屏通知限制保持一致说明
 
 ---
 
@@ -332,16 +338,17 @@ cd backend && npm run test:all && npx tsc --noEmit && npm run build
 
 原子任务：
 
-- [ ] 检查 Firebase config 是否只包含可公开客户端配置
-- [ ] 确认 DeepSeek API key 只在 backend `.env`
-- [ ] 检查 Todoist token 仅存本地 AsyncStorage
-- [ ] 检查本地导出文件不自动上传
+- [x] 检查 Firebase config 是否只包含可公开客户端配置
+- [x] 确认 DeepSeek API key 只在 backend `.env`
+- [x] 检查 Todoist token 仅存本地 AsyncStorage
+- [x] 检查本地导出文件不自动上传
+- [ ] 在 README 增加“Firebase client config is public by design”的说明，避免安全扫描误报
 
 验收标准：
 
-- [ ] repo 中无私钥、真实 token、用户数据
+- [x] repo 中无私钥、真实 token、用户数据
 - [ ] README 明确密钥边界
-- [ ] `rg -n "DEEPSEEK_API_KEY|TODO_PRO_PASSWORD|Bearer|apiKey" .` 无敏感泄漏，Firebase public config 除外
+- [x] `rg -n "DEEPSEEK_API_KEY|TODO_PRO_PASSWORD|Bearer|apiKey" .` 无敏感泄漏，Firebase public config 除外
 
 ---
 

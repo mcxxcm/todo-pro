@@ -12,6 +12,7 @@ import {
   toggleLocalTask,
   updateLocalTask,
 } from "@/providers/localProvider";
+import type { TaskNotificationSyncResult } from "@/providers/notificationProvider";
 import { loadTasks } from "@/lib/taskStorage";
 import type { NormalizedTask, TaskUpdateInput } from "@/types/task";
 
@@ -19,6 +20,7 @@ export function useLocalTasks() {
   const [tasks, setTasks] = useState<NormalizedTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notificationFeedback, setNotificationFeedback] = useState<TaskNotificationSyncResult | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -45,9 +47,10 @@ export function useLocalTasks() {
     async (title: string, extra?: CreateTaskExtra) => {
       if (!title.trim()) return undefined;
       try {
-        const task = await createLocalTask(title, extra);
+        const result = await createLocalTask(title, extra);
+        setNotificationFeedback(result.notification);
         await refresh();
-        return task;
+        return result.task;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to add local task");
         return undefined;
@@ -61,7 +64,8 @@ export function useLocalTasks() {
       try {
         const allTasks = await loadTasks();
         const task = allTasks.find((t) => t.id === id);
-        await toggleLocalTask(id);
+        const result = await toggleLocalTask(id);
+        setNotificationFeedback(result.notification);
 
         if (task?.recurrence && task.dueAt && task.status === "todo") {
           const next = computeNextOccurrence(task.recurrence, task.dueAt);
@@ -92,7 +96,8 @@ export function useLocalTasks() {
   const updateTask = useCallback(
     async (id: string, patch: TaskUpdateInput) => {
       try {
-        await updateLocalTask(id, patch);
+        const result = await updateLocalTask(id, patch);
+        setNotificationFeedback(result.notification);
         await refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to update local task");
@@ -104,7 +109,8 @@ export function useLocalTasks() {
   const removeTask = useCallback(
     async (id: string) => {
       try {
-        await deleteLocalTask(id);
+        const result = await deleteLocalTask(id);
+        setNotificationFeedback(result.notification);
         await refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to delete local task");
@@ -123,6 +129,10 @@ export function useLocalTasks() {
       return undefined;
     }
   }, [refresh]);
+
+  const clearNotificationFeedback = useCallback(() => {
+    setNotificationFeedback(null);
+  }, []);
 
   const confirmAllTimeReviews = useCallback(async () => {
     try {
@@ -146,5 +156,7 @@ export function useLocalTasks() {
     mergeDuplicates,
     confirmAllTimeReviews,
     refresh,
+    notificationFeedback,
+    clearNotificationFeedback,
   };
 }

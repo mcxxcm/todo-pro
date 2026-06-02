@@ -4,6 +4,10 @@ import { Platform } from "react-native";
 import type { NormalizedTask } from "@/types/task";
 import { getNotificationsEnabled } from "@/lib/notificationSettings";
 
+import type { TaskNotificationSyncResult } from "@/lib/notificationTypes";
+export type { TaskNotificationSyncResult };
+export { notificationMessage } from "@/lib/notificationTypes";
+
 /**
  * Configure global notification behavior for when the app is in the foreground.
  */
@@ -50,40 +54,47 @@ function getTaskNotificationId(taskId: string): string {
  * Syncs the notification for a task.
  * If the task is incomplete and has a valid future dueAt, schedules a notification.
  * If the task is completed, archived, or has no dueAt (or it's in the past), cancels any existing notification.
+ *
+ * Returns a structured result so UI can show feedback to the user.
  */
-export async function syncTaskNotification(task: NormalizedTask) {
-  if (Platform.OS === "web") return;
+export async function syncTaskNotification(task: NormalizedTask): Promise<TaskNotificationSyncResult> {
+  if (Platform.OS === "web") {
+    return { status: "unsupported", reason: "web" };
+  }
 
-  // Check global notification toggle
+  if (!Device.isDevice) {
+    return { status: "unsupported", reason: "simulator" };
+  }
+
   const notificationsEnabled = await getNotificationsEnabled();
   if (!notificationsEnabled) {
     await cancelTaskNotification(task.id);
-    return;
+    return { status: "cancelled", reason: "disabled" };
   }
 
   const notificationId = getTaskNotificationId(task.id);
 
-  // If task is not 'todo' or doesn't have a dueAt, cancel any scheduled notification
   if (task.status !== "todo" || !task.dueAt) {
     await cancelTaskNotification(task.id);
-    return;
+    return { status: "cancelled", reason: task.status !== "todo" ? "completed" : "missing_dueAt" };
   }
 
   const dueTime = new Date(task.dueAt).getTime();
   const now = Date.now();
 
-  // If due time is in the past, no need to schedule (and cancel any existing one just in case)
   if (dueTime <= now) {
     await cancelTaskNotification(task.id);
-    return;
+    return { status: "cancelled", reason: "past_due" };
   }
 
-  // Check if we have permission
   const hasPermission = await requestNotificationPermissions();
-  if (!hasPermission) return;
+  if (!hasPermission) {
+    return { status: "permission_denied" };
+  }
 
-  // Schedule or reschedule the notification.
-  // Using the same identifier overwrites any previously scheduled notification with this ID.
+  const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const existing = allScheduled.find((n) => n.identifier === notificationId);
+
   await Notifications.scheduleNotificationAsync({
     identifier: notificationId,
     content: {
@@ -97,6 +108,11 @@ export async function syncTaskNotification(task: NormalizedTask) {
       date: new Date(dueTime),
     },
   });
+
+  if (existing) {
+    return { status: "updated", notificationId };
+  }
+  return { status: "scheduled", notificationId };
 }
 
 /**

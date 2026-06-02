@@ -195,6 +195,27 @@ npm --prefix backend run build
 - Backend regex parsing may provide a `dueAt` for common Chinese time expressions, but the app still marks extracted times for user review.
 - Model API keys belong only in the backend environment, never in the mobile app.
 
+## Security Boundaries
+
+This project distinguishes between three categories of credentials — each has a distinct security boundary:
+
+### Client-side public config (safe to commit)
+- **Firebase `apiKey`** in `lib/firebase.ts` and `mac-tools/ocr-claw.ts` is a **public client identifier** — it is not a secret. Firebase client config is designed to be publicly visible. Security is enforced by **Firestore Security Rules** and **Firebase Authentication**, not by hiding the API key.
+- The Firebase config block (`apiKey`, `authDomain`, `projectId`, etc.) may appear in the repository and is safe to commit.
+
+### Backend-only secrets (never commit)
+- **DeepSeek API key** (`DEEPSEEK_API_KEY`) — must only exist in `backend/.env` (gitignored). It is never bundled into the mobile app.
+- **OCR.Space API key** (`OCR_SPACE_API_KEY`) — same constraint as DeepSeek.
+- **Apple Vision OCR credentials** (`TODO_PRO_EMAIL`, `TODO_PRO_PASSWORD`) — backend `.env` only.
+
+### Local device secrets (never commit)
+- **Todoist Personal API Token** — stored only in on-device AsyncStorage via Settings > Integrations. Never committed to the repository. When OAuth 2.0 is implemented, access tokens will follow the same constraint.
+
+### Files never committed
+- `.env` and `backend/.env` are gitignored.
+- `backend/dist/` is gitignored (build artifact).
+- Local data export files are not automatically uploaded.
+
 ## Current Completion Map
 
 - Local task loop: active. Manual add/list/edit/complete/delete persists in AsyncStorage.

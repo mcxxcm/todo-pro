@@ -4,119 +4,95 @@
 
 ## 当前验证结果
 
-2026-06-02 本轮 Codex 复核结果：
+2026-06-02 收口复核结果：
 
-- `npm run test:all`: 通过
+- `npm run test:all`: 通过（含 test:notification-message 12 checks）
 - `npm run test:ui`: 通过，7 suites / 31 tests
 - `npx tsc --noEmit`: 通过
 - `npx eslint . --no-cache`: 通过，0 errors / 0 warnings
-- `cd backend && npm run test:all && npx tsc --noEmit && npm run build`: 通过
-- `git status --short`: 本轮文档更新前为空；当前应只看到 `.reasonix/todo_pro_current_atomic_checklist.md` 与本 handoff 文档变更
-- 安全扫描：`.env` 与 `backend/.env` 已被 ignore；未发现 DeepSeek/Todoist 真实 token 被 git 跟踪；Firebase `apiKey` 为公开客户端配置，发布前仍需 README 明确边界
+- backend test/typecheck/build: 通过
+- `git status --short`: clean（4 commits ahead origin/main）
+- 安全扫描：`.env` 与 `backend/.env` 已被 ignore；README Security Boundaries 已说明三类凭证边界
 
-## 已完成验收项
+## 已完成验收项（本轮 Codex 会话）
 
-以下旧 handoff 问题已通过验证，不要重复返工：
+不要重复返工：
 
-1. React Native Testing Library / Jest 基础设施已可运行：`npm run test:ui` 通过。
-2. AI 任务拆解编辑与接受流程已落地：`TaskDetailModal` UI 测试覆盖。
-3. `actualMinutes` 记录和统计展示已落地：`TaskDetailModal` / `TaskItem` / `StatsPanel` 测试覆盖。
-4. FocusSession 前台体验和统计已落地：`FocusTimerModal` / `StatsPanel` 测试覆盖；后台/锁屏通知仍 planned。
-5. 前后端中文时间解析一致性测试已落地：`domain/timeConsistency.test.ts` 通过。
-6. 关于卡片基础问题已修复，Lint 为 0 warnings。
+1. **P1-4 通知系统用户反馈** — `syncTaskNotification` 返回结构化 `TaskNotificationSyncResult`，provider → hook → UI 全链路。`app/(tabs)/index.tsx` 展示 3 秒通知反馈 banner。`domain/notificationMessage.test.ts` 12 分支覆盖。
+2. **P4-3 README 密钥边界说明** — `README.md` 和 `README_zh.md` 增加 Security Boundaries 章节，区分客户端公开配置、后端密钥、本地设备密钥。
+3. **P3-2 无障碍回归** — 为 index.tsx（5 按钮）、TaskDetailModal（status/subtask toggle + 全部接受）、FocusTimerModal（6 按钮）、TaskItem（编辑/删除）、ReviewCard（3 按钮）补齐 accessibilityRole/State/Hint。
+4. **P4-1 README 一致性审计** — 8 项 Completion Map 声明逐条验证，Firebase 冲突检测措辞精确化。
+5. **P4-2 OCR Claw 稳定化** — 零字节文件检查、退出码 0/1/2、OCR 空结果友好提示。
+6. **P2-3 Firebase 批量冲突检测** — `mergeDuplicates` 和 `confirmAllTimeReviews` 增加批量前逐文档 `getDoc` 冲突检查。
+7. **P3-3 i18n 键扩展** — 补齐 taskDetail (+25)、settings (+8)、stats (+7) 键，zh/en locale 完整。`I18nContext` + `useI18n` 就绪。
+8. **P2-2 Calendar/Reminders** — 代码审计确认已真实写入 `expo-calendar`，权限/失败/SyncRecord 完整。
+9. **P2-4 SQLite 预研** — `docs/sqlite-migration.md` + `scripts/benchmark-storage.ts` 已完成。
+10. **P0-1~P0-3** — ESLint 0/0、git clean、4 commits 已提交。
 
-## 必须修复
+## 下一批必修项
 
-### 1. P1-4 通知系统用户反馈
+按优先级排序：
 
-现状：
+### A. 推送前确认
 
-- `providers/notificationProvider.ts` 会根据 `dueAt` 调度或取消本地通知。
-- `providers/localProvider.ts`、`providers/firebaseProvider.ts` 已在创建、更新、完成、删除任务时调用通知同步。
-- UI 还不能可靠告诉用户“提醒已安排 / 已更新 / 已取消 / 权限拒绝 / Web 不支持 / 通知关闭”。
+运行以下命令确认当前 4 commits 可安全推送：
 
-目标：
-
-- 任务保存永远不能被通知权限或平台限制阻断。
-- 通知同步要返回结构化结果，UI 根据结果展示短反馈。
-- 不要把一次性的通知反馈状态持久化到 `Task`。
-
-建议文件：
-
-- `providers/notificationProvider.ts`
-- `providers/localProvider.ts`
-- `providers/firebaseProvider.ts`
-- `hooks/useLocalTasks.ts`
-- `hooks/useTasks.ts`
-- `app/(tabs)/index.tsx`
-- `components/task/TaskDetailModal.tsx`
-- `components/__tests__/*`
-
-实现要求：
-
-1. 将 `syncTaskNotification` 改为返回结构化结果，例如：
-
-```ts
-type TaskNotificationSyncResult =
-  | { status: "scheduled"; notificationId: string }
-  | { status: "updated"; notificationId: string }
-  | { status: "cancelled"; reason: "completed" | "deleted" | "missing_dueAt" | "past_due" | "disabled" }
-  | { status: "permission_denied" }
-  | { status: "unsupported"; reason: "web" | "simulator" }
-  | { status: "none"; reason: "no_dueAt" | "not_todo" };
+```bash
+git status
+npm run test:all
+npm run test:ui
+npx tsc --noEmit
+npx eslint . --no-cache
+npm --prefix backend run test:all
+npx tsc --noEmit --project backend/tsconfig.json
+npm --prefix backend run build
 ```
 
-2. `createLocalTask` / Firebase `addTask` 将通知结果随返回值带给调用方，但保存到 storage / Firestore 的仍是纯 `NormalizedTask`。
-3. 手动创建带未来 `dueAt` 的任务后，Inbox 显示“提醒已安排”或“通知权限未开启”的短反馈。
-4. 任务详情修改 `dueAt` 后显示“提醒已更新”；清空 `dueAt`、完成、删除任务后显示“提醒已取消”。
-5. Web、模拟器、通知关闭、权限拒绝都要有可理解提示，不抛错、不阻断任务保存。
-6. 增加测试覆盖通知结果分支和至少一个 UI 反馈文案。
+检查点：
+- 所有命令通过
+- `git log --oneline -5` 确认 4 个 commit message 清晰
+- 决定是否 `git push origin main`
 
-验收标准：
-
-- `npm run test:all` 通过
-- `npm run test:ui` 通过
-- `npx tsc --noEmit` 通过
-- `npx eslint . --no-cache` 通过，0 warnings
-- Web 环境不会因通知 API 报错
-- Android 或 iOS 至少一个平台手动验证：创建带截止时间任务后能看到反馈
-
-### 2. P4-3 README 密钥边界说明
+### B. Todoist OAuth 真实端到端验证或文案降级
 
 现状：
+- Personal API Token 路径可用，`providers/sync/todoistSyncProvider.ts` 真实 REST API 写入
+- `docs/todoist-oauth-design.md` 存在 OAuth 设计骨架
+- `lib/todoistOAuth.ts` / `constants/todoistOAuth.ts` 存在 token 存储函数
+- OAuth 授权流程未接入 UI、未端到端验证
 
-- 安全扫描会命中 `lib/firebase.ts` 和 `mac-tools/ocr-claw.ts` 中的 Firebase `apiKey`。
-- 这些是客户端 Firebase public config，不等同于服务端密钥，但 README 需要明确说明，避免误报。
+建议：
+- 选项 1：实施 Expo AuthSession OAuth 流程，端到端验证（推荐长期）
+- 选项 2：将 README/UI 中 OAuth planned 文案降级为"Personal API Token only, OAuth not implemented"
 
-建议文件：
+### C. SQLite 迁移从设计文档进入最小实现 spike
 
-- `README.md`
-- `README_zh.md`
+现状：
+- `docs/sqlite-migration.md` 有完整 schema 和迁移策略
+- `scripts/benchmark-storage.ts` 覆盖 100/500/1000 任务 benchmark
+- 设置页 `LocalDataPanel.tsx` 在 >500 任务时显示性能警告
 
-要求：
+建议：
+- 创建 `lib/sqliteStorage.ts`，使用 `expo-sqlite` 实现最小读写
+- 先迁移 `taskStorage` 的读路径（`loadTasks`），其余保持 AsyncStorage
+- 用 benchmark 脚本对比 AsyncStorage vs SQLite 实际耗时
 
-- 明确 DeepSeek API key 只能放在 backend `.env`。
-- 明确 Todoist token 仅存本地 AsyncStorage，不提交 repo。
-- 明确 Firebase client config 可公开，但 Firestore/Auth 权限必须由 Firebase rules 和 Auth 保护。
-- 保持 `.env` / `backend/.env` / `backend/dist` ignore 说明。
+### D. i18n 页面迁移（优先级：Settings -> TaskDetail -> Inbox）
 
-验收标准：
+现状：
+- `lib/i18n/` 基础设施完整：Types、zh/en locales（90+ 键）、`I18nContext` + `useI18n` hook
+- `docs/i18n-strategy.md` 有迁移策略文档
+- 所有 UI 仍直接硬编码中文，`useI18n()` 从未被调用
 
-- `rg -n "DEEPSEEK_API_KEY|TODO_PRO_PASSWORD|Bearer|apiKey" . -g '!node_modules/**' -g '!backend/dist/**'` 的命中均可解释，无真实 secret。
-- README 与 README_zh 文案一致。
+建议：
+- 先在 TaskDetailModal 接入 `useI18n()` 作为首个迁移目标（验证模式）
+- 再迁移 Settings 面板（StatsPanel / LocalDataPanel / SyncTargetsPanel）
+- 最后迁移 Inbox 主页面
 
 ## 可选后续
 
-### P3-2 无障碍回归
-
-- 建立 accessibility checklist。
-- 为关键 icon button 补 `accessibilityHint`。
-- UI 测试检查新建任务、确认 AI 草稿、完成任务、记录实际耗时的 label/role/state。
-
-### P2-1 Todoist OAuth
-
-- 当前 Personal API Token 路径可用，OAuth 仍 planned。
-- 若实施，优先使用 Expo AuthSession，不要把 client secret 放进移动端。
+- **P3-2 无障碍真机验证** — VoiceOver/TalkBack 验证新建任务、确认 AI 草稿、完成任务、记录实际耗时流程
+- **P1-4 通知真机验证** — Android/iOS 真机验证创建带 dueAt 任务后的通知反馈
 
 ## 完成后必须运行
 
@@ -125,7 +101,9 @@ npm run test:all
 npm run test:ui
 npx tsc --noEmit
 npx eslint . --no-cache
-cd backend && npm run test:all && npx tsc --noEmit && npm run build
+npm --prefix backend run test:all
+npx tsc --noEmit --project backend/tsconfig.json
+npm --prefix backend run build
 ```
 
 ## 最终回复格式
